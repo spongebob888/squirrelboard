@@ -72,6 +72,20 @@ Deploy the generated `dist/` directory behind a same-origin reverse proxy. [depl
 
 `pnpm preview` inherits Vite's configured API proxy, so the same empty-address setup works for a local build preview. For example, use `SHADOWQUIC_API_URL=http://192.168.7.1:9090 corepack pnpm preview` to preview against the router. A `dist/` directory served by a separate static server does not include Vite's proxy; use the Nginx configuration for that deployment.
 
+## GitHub Pages
+
+[.github/workflows/pages.yml](.github/workflows/pages.yml) installs the pinned pnpm version, runs tests, builds the dashboard, and deploys `dist/` on pushes to `main`. Pull requests to `main` run the same checks without deploying. You can also run the workflow manually on `main` from the Actions tab.
+
+In the repository's **Settings → Pages → Build and deployment**, set **Source** to **GitHub Actions**. After a successful deployment, the dashboard will be available at `https://spongebob888.github.io/squirrelboard/`.
+
+The workflow sets `VITE_BASE_PATH` to the repository's subdirectory, so JavaScript, CSS, and icons load correctly under `/squirrelboard/`. Normal local builds continue to use `/`. To reproduce the Pages build locally:
+
+```sh
+VITE_BASE_PATH=/squirrelboard/ corepack pnpm build
+```
+
+GitHub Pages serves static files and does not provide the `/api/v1` proxy. In Settings, enter a browser-accessible API address that permits the dashboard's origin through CORS. A hosted HTTPS dashboard also needs an API connection allowed by the browser's HTTPS and local-network policies. Demo mode works without a backend.
+
 ## Checks
 
 ```sh

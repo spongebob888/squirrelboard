@@ -8,6 +8,8 @@ import { bytes, duration, packetLossRate } from './lib/metrics'
 import { validateProbeUrl } from './lib/api'
 import type { Backend, Connection, Outbound } from './lib/types'
 
+const logoUrl = `${import.meta.env.BASE_URL}favicon.svg`
+
 type Page = 'Overview' | 'Outbounds' | 'Connections' | 'Traffic' | 'Settings'
 const pages = [
   { name: 'Overview' as Page, icon: LayoutDashboard },
@@ -144,7 +146,7 @@ function exportConnections() {
   <div class="app-shell">
     <div v-if="sidebarOpen" class="sidebar-backdrop" @click="sidebarOpen = false"/>
     <aside class="sidebar" :class="{ open: sidebarOpen }">
-      <a class="brand" href="#overview" @click.prevent="navigate('Overview')"><img src="/favicon.svg" alt="" width="35" height="35"/><span>squirrelboard<small>SHADOWQUIC DASHBOARD</small></span></a>
+      <a class="brand" href="#overview" @click.prevent="navigate('Overview')"><img :src="logoUrl" alt="" width="35" height="35"/><span>squirrelboard<small>SHADOWQUIC DASHBOARD</small></span></a>
       <div class="workspace-label">WORKSPACE</div>
       <nav aria-label="Main navigation"><button v-for="item in pages" :key="item.name" class="nav-item" :class="{ active: page === item.name }" :aria-current="page === item.name ? 'page' : undefined" @click="item.name === 'Settings' ? openSettings() : navigate(item.name)"><component :is="item.icon" :size="19"/><span>{{ item.name }}</span><span v-if="item.name === 'Connections' && activeCount" class="nav-count">{{ activeCount }}</span></button></nav>
       <div class="sidebar-bottom">
@@ -202,7 +204,7 @@ function exportConnections() {
           <section class="panel probe-settings"><div class="panel-heading"><div><h2>Latency probes</h2><p>Test a route by requesting HTTP response headers through an outbound</p></div><Zap :size="19" class="muted"/></div><form class="settings-form" @submit.prevent="saveProbe()"><label>Probe URL<div class="inline-form"><input v-model="probeUrl" type="url" required placeholder="http://example.com/"/><button class="button" type="submit">Save URL</button></div><small>Use an http:// address that returns a 2xx response. Shadowquic does not follow redirects or support HTTPS probes. Timeout: 10 seconds.</small></label><p v-if="probeError" class="form-message error" role="alert">{{ probeError }}</p></form></section>
         </template>
 
-        <footer class="page-footer"><span><img src="/favicon.svg" alt="" width="16" height="16"/>squirrelboard <span class="footer-dot">·</span> A clear view of your network.</span><a href="https://github.com/Zephyruso/zashboard" target="_blank" rel="noreferrer">Inspired by zashboard <ExternalLink :size="11"/></a></footer>
+        <footer class="page-footer"><span><img :src="logoUrl" alt="" width="16" height="16"/>squirrelboard <span class="footer-dot">·</span> A clear view of your network.</span><a href="https://github.com/Zephyruso/zashboard" target="_blank" rel="noreferrer">Inspired by zashboard <ExternalLink :size="11"/></a></footer>
       </div>
     </main>
     <Transition name="toast"><div v-if="notice" class="toast-message" role="status"><span>{{ notice }}</span><button class="icon-button" aria-label="Dismiss notification" @click="notice = ''"><X :size="15"/></button></div></Transition>
