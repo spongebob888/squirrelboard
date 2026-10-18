@@ -54,6 +54,7 @@ curl --noproxy '*' -i http://192.168.7.1:9090/api/v1/outbounds
 - Outbound selectors, individual and bulk HTTP probes, and cached QUIC RTT, packet loss, MTU, and sample age.
 - Searchable, filterable, paginated connections, session details, and JSON export.
 - Cumulative traffic by inbound and protocol, plus optional jemalloc memory statistics.
+- Per-outbound first-response latency distributions with median, P95, average, and 5/15/30-minute views.
 - Adjustable polling, pause/resume, reconnect feedback, responsive navigation, and light/dark themes.
 
 Rates compare each TCP/UDP counter against its previous snapshot using elapsed monotonic time. Counter resets and newly added inbounds do not create historical-traffic spikes. The first successful snapshot establishes the baseline; speed appears after the next update. Polling pauses in hidden tabs. A failed refresh retains the last snapshot and marks it stale. A missing or unsupported memory endpoint does not prevent the other views from working.
@@ -61,6 +62,8 @@ Rates compare each TCP/UDP counter against its previous snapshot using elapsed m
 Selector switches apply to new sessions and remain in Shadowquic's memory until restart. Existing sessions retain their target. Probe results are cached by Shadowquic and may predate a selector change. Probes require an `http://` URL returning 2xx, do not follow redirects, and time out after ten seconds. No rule editing, session termination, or config reload controls are shown because this API does not provide those operations.
 
 Backend name, URL, polling interval, probe URL, and theme are browser-local preferences. The API secret is stored in this tab's `sessionStorage`, not `localStorage`. No backend secrets are baked into the build. Demo mode never sends API requests.
+
+The Traffic page collects one first-response measurement per observed session, including sessions that later close. Measurements remain in this tab for 30 minutes, up to 10,000 samples, and reset on reload or backend reconnect. Repeated polls do not duplicate a session; pending/unavailable measurements are excluded, while a measured zero is included. Sessions that start and finish between polls cannot be observed. Groups use the connection's recorded outbound tag, so selector traffic remains attributed to the selector. Median uses the middle value (or average of the middle pair), and P95 uses nearest rank. Charts show the percentage of samples in each labeled latency bucket.
 
 ## Build and serve
 

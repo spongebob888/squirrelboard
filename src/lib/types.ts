@@ -58,4 +58,5 @@ export interface Snapshot {
   memoryNote: string
 }
 export interface Sample { at: number; download: number; upload: number }
+export interface LatencySample { outbound: string; latency: number; observedAt: number }
 export interface Backend { name: string; url: string; secret: string; interval: number }

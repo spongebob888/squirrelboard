@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { Activity, ArrowDown, ArrowDownLeft, ArrowDownUp, ArrowRight, ArrowUp, ArrowUpRight, Check, ChevronDown, ChevronRight, CircleHelp, Clock3, Copy, Cpu, Download, ExternalLink, Globe2, Layers3, LayoutDashboard, LoaderCircle, Menu, Moon, Network, Pause, Play, Radio, RefreshCw, Search, Server, Settings2, ShieldCheck, Sun, Upload, Wifi, WifiOff, X, Zap } from './components/icons'
 import TrafficChart from './components/TrafficChart.vue'
 import OutboundCard from './components/OutboundCard.vue'
+import LatencyDistribution from './components/LatencyDistribution.vue'
 import { useDashboard } from './composables/dashboard'
 import { bytes, duration, packetLossRate } from './lib/metrics'
 import { validateProbeUrl } from './lib/api'
@@ -33,7 +34,7 @@ function shortcut(event: KeyboardEvent) {
 }
 window.addEventListener('keydown', shortcut)
 onBeforeUnmount(() => window.removeEventListener('keydown', shortcut))
-const { backend, demo, data, history, status, error, lastUpdated, paused, loading, probing, selecting, notice, aggregate, speed, refresh, connect, reset, probe, select, toast, togglePause } = useDashboard()
+const { backend, demo, data, history, latencySamples, latencyAsOf, status, error, lastUpdated, paused, loading, probing, selecting, notice, aggregate, speed, refresh, connect, reset, probe, select, toast, togglePause } = useDashboard()
 const search = ref('')
 const protocol = ref('all')
 const outboundFilter = ref('all')
@@ -193,6 +194,7 @@ function exportConnections() {
 
         <template v-if="page === 'Traffic'">
           <div class="traffic-detail-grid"><section class="panel"><div class="panel-heading"><div><h2>Traffic by inbound</h2><p>Cumulative payload counters, including completed sessions</p></div><Layers3 :size="18" class="muted"/></div><div v-if="!data.inbounds.length" class="empty-state"><Layers3 :size="28"/><h3>No inbound statistics yet</h3><p>Connect your backend to start tracking traffic.</p></div><div v-for="inbound in data.inbounds" :key="inbound.inbound" class="inbound-row"><div class="inbound-heading"><span class="section-icon"><Server :size="17"/></span><div><h3>{{ inbound.inbound }}</h3><small>{{ inbound.tcp_conns }} TCP · {{ inbound.udp_conns }} UDP sessions</small></div><strong>{{ bytes(inbound.tcp_download_bytes + inbound.udp_download_bytes + inbound.tcp_upload_bytes + inbound.udp_upload_bytes) }}</strong></div><div class="inbound-bar"><span :style="{ width: `${trafficTotal ? (inbound.tcp_download_bytes + inbound.udp_download_bytes + inbound.tcp_upload_bytes + inbound.udp_upload_bytes) / trafficTotal * 100 : 0}%` }"/></div><div class="inbound-values"><span><ArrowDown :size="13"/>{{ bytes(inbound.tcp_download_bytes + inbound.udp_download_bytes) }}</span><span><ArrowUp :size="13"/>{{ bytes(inbound.tcp_upload_bytes + inbound.udp_upload_bytes) }}</span></div></div></section><section class="panel protocol-panel"><div class="panel-heading"><h2>Protocol breakdown</h2><ArrowDownUp :size="17" class="muted"/></div><div class="donut" :style="{ background: `conic-gradient(var(--primary) 0% ${tcpPercent}%, var(--teal) ${tcpPercent}% 100%)` }"><div><strong>{{ bytes(trafficTotal) }}</strong><small>total traffic</small></div></div><div class="protocol-summary"><span><i class="tiny-dot purple-bg"/>TCP<strong>{{ tcpPercent.toFixed(1) }}%</strong></span><span><i class="tiny-dot teal-bg"/>UDP<strong>{{ (trafficTotal ? 100 - tcpPercent : 0).toFixed(1) }}%</strong></span></div></section></div>
+          <LatencyDistribution :samples="latencySamples" :outbounds="data.outbounds.map(outbound => outbound.tag)" :as-of="latencyAsOf"/>
           <section class="panel"><div class="panel-heading"><div><h2>Allocator memory</h2><p>Jemalloc statistics · These values describe the allocator, not total process RSS</p></div><Cpu :size="18" class="muted"/></div><div v-if="data.memory" class="memory-detail"><div><span>Resident</span><strong>{{ bytes(data.memory.resident_bytes) }}</strong><small>Resident allocator pages</small></div><div><span>Active</span><strong>{{ bytes(data.memory.active_bytes) }}</strong><small>Pages backing active allocations</small></div><div><span>Allocated</span><strong>{{ bytes(data.memory.allocated_bytes) }}</strong><small>Memory in use by the application</small></div><div class="memory-utilization"><span>Allocated / resident</span><strong>{{ memoryPercent.toFixed(1) }}%</strong><div class="inbound-bar"><span :style="{ width: `${memoryPercent}%` }"/></div></div></div><div v-else class="empty-state"><Cpu :size="26"/><h3>Memory statistics unavailable</h3><p>{{ data.memoryNote || 'Connect to a backend with jemalloc support to view allocator statistics.' }}</p></div></section>
         </template>
 

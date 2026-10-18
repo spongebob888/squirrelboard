@@ -1,8 +1,9 @@
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef } from 'vue'
 import { ApiError, ShadowquicApi, normalizeBase } from '../lib/api.ts'
 import { demoHistory, demoProbe, demoSelect, demoSnapshot } from '../lib/demo.ts'
 import { rates, totals } from '../lib/metrics.ts'
-import type { Backend, Outbound, Sample, Snapshot } from '../lib/types.ts'
+import { ConnectionLatencyHistory } from '../lib/latency.ts'
+import type { Backend, LatencySample, Outbound, Sample, Snapshot } from '../lib/types.ts'
 
 const empty = (): Snapshot => ({ outbounds: [], connections: [], inbounds: [], memory: null, memoryNote: '' })
 function savedBackend(): Backend {
@@ -17,6 +18,9 @@ export function useDashboard() {
   const demo = ref(new URLSearchParams(location.search).get('demo') === '1')
   const data = ref<Snapshot>(empty())
   const history = ref<Sample[]>([])
+  const latencySamples = shallowRef<LatencySample[]>([])
+  const latencyAsOf = ref(Date.now())
+  let latencyHistory = new ConnectionLatencyHistory()
   const status = ref<'connecting' | 'connected' | 'offline'>('connecting')
   const error = ref('')
   const lastUpdated = ref<number | null>(null)
@@ -60,6 +64,8 @@ export function useDashboard() {
           history.value = [...history.value, { at, ...rates(prior.inbounds, snapshot.inbounds, monotonic - prior.at) }].filter(s => at - s.at <= 120000).slice(-120)
         }
         prior = { inbounds: snapshot.inbounds, at: monotonic }
+        latencySamples.value = latencyHistory.observe(snapshot.connections, at)
+        latencyAsOf.value = at
         data.value = snapshot
         lastUpdated.value = at
         status.value = 'connected'
@@ -68,6 +74,8 @@ export function useDashboard() {
         if (current !== generation || signal.aborted) return
         status.value = 'offline'
         prior = null
+        latencyAsOf.value = Date.now()
+        latencySamples.value = latencyHistory.prune(latencyAsOf.value)
         error.value = cause instanceof ApiError && cause.status === 401
           ? 'Authentication failed. Check your API secret in Settings.'
           : cause instanceof Error ? cause.message : 'Could not refresh the dashboard.'
@@ -88,6 +96,9 @@ export function useDashboard() {
     prior = null
     data.value = empty()
     history.value = isDemo ? demoHistory() : []
+    latencyHistory = new ConnectionLatencyHistory()
+    latencySamples.value = []
+    latencyAsOf.value = Date.now()
     lastUpdated.value = null
     error.value = ''
     status.value = 'connecting'
@@ -168,5 +179,5 @@ export function useDashboard() {
     clearTimeout(noticeTimer)
     document.removeEventListener('visibilitychange', visibility)
   })
-  return { backend, demo, data, history, status, error, lastUpdated, paused, loading, probing, selecting, notice, aggregate, speed, refresh, connect, reset, probe, select, toast, togglePause }
+  return { backend, demo, data, history, latencySamples, latencyAsOf, status, error, lastUpdated, paused, loading, probing, selecting, notice, aggregate, speed, refresh, connect, reset, probe, select, toast, togglePause }
 }
