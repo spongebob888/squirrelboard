@@ -9,6 +9,12 @@ const windowMinutes = ref(30)
 const distributions = computed(() => latencyDistributions(props.samples, props.outbounds, props.asOf - windowMinutes.value * 60000))
 const sampleCount = computed(() => distributions.value.reduce((sum, group) => sum + group.count, 0))
 const latency = (value: number | null) => value == null ? '—' : `${Number(value.toFixed(1))} ms`
+const bucketStep = (count: number) => 504 / count
+const bucketCenter = (index: number, count: number) => 56 + (index + .5) * bucketStep(count)
+function showBucketLabel(index: number, count: number) {
+  const intervals = Math.min(6, count - 1)
+  return Array.from({ length: intervals + 1 }, (_, tick) => Math.round(tick * (count - 1) / Math.max(1, intervals))).includes(index)
+}
 </script>
 
 <template>
@@ -40,6 +46,7 @@ const latency = (value: number | null) => value == null ? '—' : `${Number(valu
             <div><dt>P95</dt><dd>{{ latency(group.p95) }}</dd></div>
             <div><dt>Average</dt><dd>{{ latency(group.mean) }}</dd></div>
           </dl>
+          <div class="latency-bin-label">{{ group.binWidth == null ? 'Coarse bins' : `Adaptive bins · ${group.binWidth} ms` }}</div>
           <div class="latency-plot-scroll">
             <svg class="latency-plot" viewBox="0 0 600 195" role="img" :aria-label="`${group.outbound}: first-response latency distribution for ${group.count} sessions`">
               <desc>{{ group.buckets.map(bucket => `${bucket.label} milliseconds: ${bucket.count} sessions (${bucket.percent.toFixed(1)}%)`).join('; ') }}</desc>
@@ -48,11 +55,11 @@ const latency = (value: number | null) => value == null ? '—' : `${Number(valu
                 <text x="46" :y="154 - tick * 1.25" text-anchor="end" class="latency-axis">{{ tick }}%</text>
               </g>
               <g v-for="(bucket, index) in group.buckets" :key="bucket.label" class="latency-bucket">
-                <rect :x="68 + index * 72" :y="150 - bucket.percent * 1.25" width="48" :height="bucket.percent * 1.25" rx="3" class="latency-bar">
+                <rect :x="bucketCenter(index, group.buckets.length) - bucketStep(group.buckets.length) / 3" :y="150 - bucket.percent * 1.25" :width="bucketStep(group.buckets.length) * 2 / 3" :height="bucket.percent * 1.25" :rx="Math.min(3, bucketStep(group.buckets.length) / 6)" class="latency-bar">
                   <title>{{ bucket.label }} ms: {{ bucket.count }} sessions ({{ bucket.percent.toFixed(1) }}%)</title>
                 </rect>
-                <text v-if="bucket.count" :x="92 + index * 72" :y="143 - bucket.percent * 1.25" text-anchor="middle" class="latency-count">{{ bucket.count }}</text>
-                <text :x="92 + index * 72" y="173" text-anchor="middle" class="latency-axis">{{ bucket.label }}</text>
+                <text v-if="bucket.count && group.buckets.length <= 12" :x="bucketCenter(index, group.buckets.length)" :y="143 - bucket.percent * 1.25" text-anchor="middle" class="latency-count">{{ bucket.count }}</text>
+                <text v-if="showBucketLabel(index, group.buckets.length)" :x="bucketCenter(index, group.buckets.length)" y="173" text-anchor="middle" class="latency-axis">{{ bucket.label }}</text>
               </g>
               <text x="572" y="190" text-anchor="end" class="latency-axis">First response (ms)</text>
             </svg>
@@ -141,6 +148,11 @@ const latency = (value: number | null) => value == null ? '—' : `${Number(valu
 }
 .latency-plot-scroll {
   overflow-x: auto;
+}
+.latency-bin-label {
+  color: var(--muted);
+  font-size: 9px;
+  margin-bottom: 6px;
 }
 .latency-plot {
   display: block;

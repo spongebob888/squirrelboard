@@ -74,3 +74,45 @@ test('median averages the middle pair and P95 uses nearest rank', () => {
   assert.equal(group.median, 10.5)
   assert.equal(group.p95, 19)
 })
+
+test('bins adapt per outbound only after enough samples in the selected window', () => {
+  const samples = Array.from({ length: 50 }, (_, latency) => ({ outbound: 'busy', latency, observedAt: 1000 }))
+  samples.push(...Array.from({ length: 49 }, (_, latency) => ({ outbound: 'quiet', latency, observedAt: 1000 })))
+  samples.push(...Array.from({ length: 100 }, () => ({ outbound: 'quiet', latency: 42, observedAt: 0 })))
+  const groups = latencyDistributions(samples, [], 500)
+  const busy = groups.find(group => group.outbound === 'busy')!
+  const quiet = groups.find(group => group.outbound === 'quiet')!
+  assert.equal(busy.binWidth, 10)
+  assert.equal(quiet.binWidth, null)
+  assert.deepEqual(busy.buckets.map(bucket => bucket.count), [10, 10, 10, 10, 10, 0])
+})
+
+test('more data narrows bins for the same latency distribution', () => {
+  const samples = (repeats: number) => Array.from({ length: 100 * repeats }, (_, index) => ({ outbound: 'proxy', latency: index % 100, observedAt: 0 }))
+  const small = latencyDistributions(samples(1), [], 0)[0]!
+  const large = latencyDistributions(samples(25), [], 0)[0]!
+  assert.equal(small.binWidth, 10)
+  assert.equal(large.binWidth, 2)
+  assert.ok(large.buckets.length > small.buckets.length)
+  assert.equal(large.buckets.reduce((sum, bucket) => sum + bucket.count, 0), large.count)
+})
+
+test('adaptive bins preserve outliers and zero latency without widening the main grid', () => {
+  const samples = Array.from({ length: 100 }, () => ({ outbound: 'proxy', latency: 0, observedAt: 0 }))
+  samples.push({ outbound: 'proxy', latency: 1000000, observedAt: 0 })
+  const group = latencyDistributions(samples, [], 0)[0]!
+  assert.equal(group.binWidth, 1)
+  assert.equal(group.buckets[0]!.count, 100)
+  assert.equal(group.buckets.at(-1)!.count, 1)
+  assert.equal(group.buckets.at(-1)!.label, '≥1')
+  assert.ok(Math.abs(group.buckets.reduce((sum, bucket) => sum + bucket.percent, 0) - 100) < 1e-10)
+})
+
+test('dense adaptive charts have bounded bin counts and exact, exclusive upper edges', () => {
+  const samples = Array.from({ length: 10000 }, (_, index) => ({ outbound: 'proxy', latency: index, observedAt: 0 }))
+  const group = latencyDistributions(samples, [], 0)[0]!
+  assert.ok(group.buckets.length <= 66)
+  assert.equal(group.buckets[0]!.count, group.binWidth)
+  assert.equal(group.buckets[1]!.count, group.binWidth)
+  assert.equal(group.buckets.reduce((sum, bucket) => sum + bucket.count, 0), 10000)
+})

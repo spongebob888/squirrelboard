@@ -65,6 +65,8 @@ Backend name, URL, polling interval, probe URL, and theme are browser-local pref
 
 The Traffic page collects one first-response measurement per observed session, including sessions that later close. Measurements remain in this tab for 30 minutes, up to 10,000 samples, and reset on reload or backend reconnect. Repeated polls do not duplicate a session; pending/unavailable measurements are excluded, while a measured zero is included. Sessions that start and finish between polls cannot be observed. Groups use the connection's recorded outbound tag, so selector traffic remains attributed to the selector. Median uses the middle value (or average of the middle pair), and P95 uses nearest rank. Charts show the percentage of samples in each labeled latency bucket.
 
+Outbounds with fewer than 50 samples in the selected window use coarse latency buckets. With 50 or more, bin widths adapt to the sample count and observed range: more data supports narrower intervals, with readable 1/2/5-based widths and a minimum of 1 ms. The grid covers the minimum through P95 with up to 65 finite bins; an overflow bin retains higher latencies without letting outliers widen the main grid. Each chart displays its bin width, and hover tooltips show the interval, sample count, and percentage for every bar.
+
 ## Build and serve
 
 ```sh

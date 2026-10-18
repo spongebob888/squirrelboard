@@ -67,6 +67,31 @@ export const LATENCY_BUCKETS = [
   { label: '≥1k', upper: Infinity },
 ]
 
+function distributionBuckets(values: number[]) {
+  if (values.length < 50) return { definitions: LATENCY_BUCKETS, binWidth: null }
+
+  // More observations support more bins. Focus the grid on the main 95% so a
+  // handful of slow responses cannot force all ordinary responses into one bin.
+  const budget = Math.min(64, Math.floor(Math.sqrt(values.length)))
+  const minimum = values[0]!
+  const p95 = values[Math.ceil(values.length * .95) - 1]!
+  const desiredWidth = Math.max(1, (p95 - minimum) / budget)
+  const magnitude = 10 ** Math.floor(Math.log10(desiredWidth))
+  const step = [1, 2, 5, 10].find(step => step * magnitude >= desiredWidth)!
+  const binWidth = step * magnitude
+  const start = Math.floor(minimum / binWidth) * binWidth
+  // Include P95 in a finite, half-open bin even when it lies on an edge.
+  const end = (Math.floor(p95 / binWidth) + 1) * binWidth
+  const count = Math.round((end - start) / binWidth)
+  const definitions = Array.from({ length: count }, (_, index) => {
+    const lower = start + index * binWidth
+    const upper = lower + binWidth
+    return { label: `${lower}–${upper}`, upper }
+  })
+  definitions.push({ label: `≥${end}`, upper: Infinity })
+  return { definitions, binWidth }
+}
+
 export function latencyDistributions(samples: LatencySample[], outboundTags: string[], since: number) {
   const groups = new Map<string, number[]>(outboundTags.map(tag => [tag, []]))
   for (const sample of samples) {
@@ -78,12 +103,13 @@ export function latencyDistributions(samples: LatencySample[], outboundTags: str
   return [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([outbound, values]) => {
     values.sort((a, b) => a - b)
     const count = values.length
-    const buckets = LATENCY_BUCKETS.map(bucket => ({ ...bucket, count: 0, percent: 0 }))
+    const { definitions, binWidth } = distributionBuckets(values)
+    const buckets = definitions.map(bucket => ({ ...bucket, count: 0, percent: 0 }))
     for (const value of values) buckets.find(bucket => value < bucket.upper)!.count++
     for (const bucket of buckets) bucket.percent = count ? bucket.count / count * 100 : 0
     const middle = Math.floor(count / 2)
     return {
-      outbound, count, buckets,
+      outbound, count, buckets, binWidth,
       median: count ? (count % 2 ? values[middle]! : (values[middle - 1]! + values[middle]!) / 2) : null,
       p95: count ? values[Math.ceil(count * .95) - 1]! : null,
       mean: count ? values.reduce((sum, value) => sum + value, 0) / count : null,
