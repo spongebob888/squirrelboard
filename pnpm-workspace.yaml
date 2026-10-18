@@ -1,0 +1,10 @@
+overrides:
+  rollup: 4.62.2
+  postcss: 8.5.15
+  '@babel/parser': 7.29.7
+  magic-string: 0.30.21
+  nanoid: 3.3.12
+  '@babel/types': 7.29.7
+  picomatch: 4.0.4
+allowBuilds:
+  esbuild: true
