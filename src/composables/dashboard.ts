@@ -5,7 +5,7 @@ import { rates, totals } from '../lib/metrics.ts'
 import { ConnectionLatencyHistory } from '../lib/latency.ts'
 import type { Backend, LatencySample, Outbound, Sample, Snapshot } from '../lib/types.ts'
 
-const empty = (): Snapshot => ({ outbounds: [], connections: [], inbounds: [], memory: null, memoryNote: '' })
+const empty = (): Snapshot => ({ outbounds: [], connections: [], inbounds: [], memory: null, memoryNote: '', tokioMetric: null, tokioMetricNote: '' })
 function savedBackend(): Backend {
   try {
     const saved = JSON.parse(localStorage.getItem('squirrelboard.backend') || '{}')

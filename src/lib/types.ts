@@ -50,12 +50,19 @@ export interface Memory {
   active_bytes: number
   resident_bytes: number
 }
+export interface TokioMetric {
+  num_workers: number
+  num_alive_tasks: number
+  global_queue_depth: number
+}
 export interface Snapshot {
   outbounds: Outbound[]
   connections: Connection[]
   inbounds: InboundTraffic[]
   memory: Memory | null
   memoryNote: string
+  tokioMetric: TokioMetric | null
+  tokioMetricNote: string
 }
 export interface Sample { at: number; download: number; upload: number }
 export interface LatencySample { outbound: string; latency: number; observedAt: number }

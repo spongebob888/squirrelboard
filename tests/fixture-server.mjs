@@ -38,6 +38,7 @@ const server = http.createServer(async (req, res) => {
     return json({ inbounds: [{ inbound: 'mixed', tcp_upload_bytes: 2048, tcp_download_bytes: download, udp_upload_bytes: 1024, udp_download_bytes: 4096, tcp_conns: 1, udp_conns: 0 }] })
   }
   if (req.url === '/api/v1/memory') return json({ error: { code: 'not_found', message: 'Not built with jemalloc' } }, 404)
+  if (req.url === '/api/v1/tokio_metric') return json({ num_workers: 8, num_alive_tasks: 42, global_queue_depth: 0 })
   if (req.url === `/api/v1/outbounds/${encodeURIComponent(selector)}/selection` && req.method === 'PUT') {
     const chunks = []
     for await (const chunk of req) chunks.push(chunk)

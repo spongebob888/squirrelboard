@@ -58,3 +58,44 @@ test('connection failures distinguish direct browser requests from the same-orig
   t.mock.method(globalThis, 'fetch', async () => { throw new TypeError('Failed to fetch') })
   await assert.rejects(new ShadowquicApi({ ...backend, url: '' }).snapshot(), (error: unknown) => error instanceof ApiError && error.code === 'network_error' && error.message.includes('dashboard proxy'))
 })
+
+test('Tokio metrics are authenticated, refresh with snapshots, and preserve zero counts', async t => {
+  let alive = 42
+  const requests: { path: string; authorization: string | null }[] = []
+  t.mock.method(globalThis, 'fetch', async (input: string, options: RequestInit) => {
+    const path = new URL(input).pathname
+    requests.push({ path, authorization: new Headers(options.headers).get('Authorization') })
+    const body = path.endsWith('/tokio_metric') ? { num_workers: 8, num_alive_tasks: alive, global_queue_depth: 0 }
+      : path.endsWith('/outbounds') ? { outbounds: [] } : path.endsWith('/connections') ? { connections: [] }
+      : path.endsWith('/traffic') ? { inbounds: [] } : { error: { code: 'not_found', message: 'Unavailable' } }
+    return new Response(JSON.stringify(body), { status: path.endsWith('/memory') ? 404 : 200 })
+  })
+  const api = new ShadowquicApi(backend)
+  const first = await api.snapshot()
+  assert.deepEqual(first.tokioMetric, { num_workers: 8, num_alive_tasks: 42, global_queue_depth: 0 })
+  assert.equal(first.tokioMetricNote, '')
+  alive = 0
+  assert.equal((await api.snapshot()).tokioMetric!.num_alive_tasks, 0)
+  const tokioRequests = requests.filter(request => request.path === '/api/v1/tokio_metric')
+  assert.equal(tokioRequests.length, 2)
+  assert.ok(tokioRequests.every(request => request.authorization === 'Bearer test-token'))
+})
+
+test('missing, failed, and malformed Tokio metrics do not block traffic or connections', async t => {
+  let tokioStatus = 404
+  t.mock.method(globalThis, 'fetch', async (input: string) => {
+    const path = new URL(input).pathname
+    const body = path.endsWith('/tokio_metric') ? (tokioStatus === 200 ? { num_alive_tasks: 42 } : { error: { code: 'unavailable', message: 'Unavailable' } })
+      : path.endsWith('/outbounds') ? { outbounds: [] } : path.endsWith('/connections') ? { connections: [] } : { inbounds: [] }
+    return new Response(JSON.stringify(body), { status: path.endsWith('/tokio_metric') ? tokioStatus : 200 })
+  })
+  for (const status of [404, 501, 503, 200]) {
+    tokioStatus = status
+    const snapshot = await new ShadowquicApi(backend).snapshot()
+    assert.equal(snapshot.tokioMetric, null)
+    assert.equal(snapshot.tokioMetricNote, [404, 501].includes(status)
+      ? 'Tokio runtime metrics are unavailable on this backend.' : 'Tokio runtime metrics could not be refreshed.')
+    assert.deepEqual(snapshot.connections, [])
+    assert.deepEqual(snapshot.inbounds, [])
+  }
+})

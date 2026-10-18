@@ -54,10 +54,13 @@ curl --noproxy '*' -i http://192.168.7.1:9090/api/v1/outbounds
 - Outbound selectors, individual and bulk HTTP probes, and cached QUIC RTT, packet loss, MTU, and sample age.
 - Searchable, filterable, paginated connections, session details, and JSON export.
 - Cumulative traffic by inbound and protocol, plus optional jemalloc memory statistics.
+- Live Tokio runtime metrics: alive tasks, worker count, and global queue depth.
 - Per-outbound first-response latency distributions with median, P95, average, and 5/15/30-minute views.
 - Adjustable polling, pause/resume, reconnect feedback, responsive navigation, and light/dark themes.
 
 Rates compare each TCP/UDP counter against its previous snapshot using elapsed monotonic time. Counter resets and newly added inbounds do not create historical-traffic spikes. The first successful snapshot establishes the baseline; speed appears after the next update. Polling pauses in hidden tabs. A failed refresh retains the last snapshot and marks it stale. A missing or unsupported memory endpoint does not prevent the other views from working.
+
+The Traffic page polls `/api/v1/tokio_metric` for Tokio runtime statistics. Alive tasks are spawned tasks that have not yet exited, including API and background tasks. Global queue depth excludes worker-local queues. Missing, unsupported, or temporarily unavailable Tokio metrics do not prevent the other dashboard metrics from updating.
 
 Selector switches apply to new sessions and remain in Shadowquic's memory until restart. Existing sessions retain their target. Probe results are cached by Shadowquic and may predate a selector change. Probes require an `http://` URL returning 2xx, do not follow redirects, and time out after ten seconds. No rule editing, session termination, or config reload controls are shown because this API does not provide those operations.
 

@@ -1,4 +1,4 @@
-import type { Backend, Connection, InboundTraffic, Memory, Outbound, Probe, Snapshot } from './types.ts'
+import type { Backend, Connection, InboundTraffic, Memory, Outbound, Probe, Snapshot, TokioMetric } from './types.ts'
 
 export class ApiError extends Error {
   status: number
@@ -63,7 +63,7 @@ export class ShadowquicApi {
   }
 
   async snapshot(signal?: AbortSignal): Promise<Snapshot> {
-    const [outbounds, connections, traffic, memory] = await Promise.all([
+    const [outbounds, connections, traffic, memory, tokioMetric] = await Promise.all([
       this.request<{ outbounds: Outbound[] }>('/outbounds', { signal }),
       this.request<{ connections: Connection[] }>('/connections', { signal }),
       this.request<{ inbounds: InboundTraffic[] }>('/traffic', { signal }),
@@ -71,11 +71,20 @@ export class ShadowquicApi {
         .then(value => ({ value, note: '' }))
         .catch(error => ({ value: null, note: error instanceof ApiError && [404, 501].includes(error.status)
           ? 'Memory statistics are unavailable on this backend.' : 'Memory statistics could not be refreshed.' })),
+      this.request<TokioMetric>('/tokio_metric', { signal }, 3000)
+        .then(value => {
+          if (!value || ![value.num_workers, value.num_alive_tasks, value.global_queue_depth].every(count => Number.isInteger(count) && count >= 0)) {
+            throw new ApiError('Unexpected Tokio runtime metrics response.', 200, 'invalid_response')
+          }
+          return { value, note: '' }
+        })
+        .catch(error => ({ value: null, note: error instanceof ApiError && [404, 501].includes(error.status)
+          ? 'Tokio runtime metrics are unavailable on this backend.' : 'Tokio runtime metrics could not be refreshed.' })),
     ])
     if (!Array.isArray(outbounds.outbounds) || !Array.isArray(connections.connections) || !Array.isArray(traffic.inbounds)) {
       throw new ApiError('The server returned an unexpected Shadowquic response.', 200, 'invalid_response')
     }
-    return { outbounds: outbounds.outbounds, connections: connections.connections, inbounds: traffic.inbounds, memory: memory.value, memoryNote: memory.note }
+    return { outbounds: outbounds.outbounds, connections: connections.connections, inbounds: traffic.inbounds, memory: memory.value, memoryNote: memory.note, tokioMetric: tokioMetric.value, tokioMetricNote: tokioMetric.note }
   }
 
   probe(tag: string, url: string, signal?: AbortSignal) {

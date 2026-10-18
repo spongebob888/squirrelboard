@@ -37,6 +37,7 @@ export function demoSnapshot(): Snapshot {
       { inbound: 'tun-in', tcp_download_bytes: 773432120 + Math.floor(elapsed * 1280000), tcp_upload_bytes: 78421943 + Math.floor(elapsed * 68000), udp_download_bytes: 283829139 + Math.floor(elapsed * 382000), udp_upload_bytes: 11349341 + Math.floor(elapsed * 8000), tcp_conns: 6, udp_conns: 2 },
     ],
     memory: { allocator: 'jemalloc', allocated_bytes: 28472115, active_bytes: 32505856, resident_bytes: 46912512 }, memoryNote: '',
+    tokioMetric: { num_workers: 8, num_alive_tasks: 142, global_queue_depth: 0 }, tokioMetricNote: '',
   }
 }
 export function demoHistory() {

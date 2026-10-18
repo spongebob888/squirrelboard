@@ -57,7 +57,7 @@ test('an in-flight live snapshot cannot replace a newly opened demo', async t =>
   const oldRequest = dashboard.refresh()
   await dashboard.reset(true)
   assert.equal(dashboard.data.value.connections.length, 24)
-  finish({ outbounds: [], connections: [], inbounds: [], memory: null, memoryNote: '' })
+  finish({ outbounds: [], connections: [], inbounds: [], memory: null, memoryNote: '', tokioMetric: null, tokioMetricNote: '' })
   await oldRequest
   assert.equal(dashboard.demo.value, true)
   assert.equal(dashboard.data.value.connections.length, 24)
