@@ -86,10 +86,61 @@ test('demo is isolated from the backend and supports mobile navigation and theme
   await page.getByRole('navigation').getByRole('button', { name: 'Connections' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Connections' })).toBeVisible()
   await page.getByLabel('Search connections').fill('github')
-  await expect(page.locator('tbody tr')).toHaveCount(2)
+  await expect(page.locator('.connection-card')).toHaveCount(2)
+  await expect(page.locator('.table-scroll')).not.toBeVisible()
   await page.getByRole('button', { name: 'Use dark theme' }).last().click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   const { requests } = await (await request.get('http://127.0.0.1:19090/__requests')).json()
   expect(requests).toHaveLength(0)
+})
+
+test.describe('Chrome mobile connection layouts', () => {
+  test.use({ isMobile: true, hasTouch: true })
+
+  for (const width of [320, 390]) {
+    for (const view of ['overview', 'connections']) {
+      test(`${view} stays in the viewport during horizontal swipes at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 844 })
+        const domain = 'long-subdomain-'.repeat(4) + 'example.com'
+        await page.route('**/api/v1/connections', route => route.fulfill({ json: { connections: [{
+          id: 'wide', protocol: 'tcp', inbound: 'mixed', outbound: 'long-outbound-name-'.repeat(8),
+          src: '[2001:db8:ffff:ffff:ffff:ffff:ffff:ffff]:65535', dst_domain: domain, dst_ip: null, dst_port: 443,
+          upload_bytes: 1024, download_bytes: 4096, duration_ms: 10000, first_response_ms: 45, half_closed: false,
+        }] } }))
+        await page.goto(`/#${view}`)
+        const card = page.locator('.connection-card')
+        await expect(card).toBeVisible()
+        await expect(page.locator('.table-scroll')).not.toBeVisible()
+        if (view === 'connections') await expect(card).toContainText('45 ms')
+        await card.scrollIntoViewIfNeeded()
+        const box = (await card.boundingBox())!
+        expect(box.x).toBeGreaterThanOrEqual(0)
+        expect(box.x + box.width).toBeLessThanOrEqual(width)
+
+        const session = await page.context().newCDPSession(page)
+        try {
+          for (const distance of [-150, 150]) {
+            await session.send('Input.synthesizeScrollGesture', {
+              x: Math.round(box.x + box.width / 2), y: Math.round(box.y + 20),
+              xDistance: distance, yDistance: 0, gestureSourceType: 'touch',
+            })
+            const viewport = await page.evaluate(() => ({
+              scrollX: window.scrollX,
+              pageWidth: document.documentElement.scrollWidth,
+              viewportWidth: window.innerWidth,
+              headerX: document.querySelector('.topbar')!.getBoundingClientRect().x,
+              visualOffset: window.visualViewport?.offsetLeft ?? 0,
+            }))
+            expect(viewport.scrollX).toBe(0)
+            expect(viewport.headerX).toBe(0)
+            expect(viewport.visualOffset).toBe(0)
+            expect(viewport.pageWidth).toBeLessThanOrEqual(viewport.viewportWidth)
+          }
+        } finally { await session.detach() }
+        await card.getByRole('button', { name: `Inspect connection to ${domain}` }).click()
+        await expect(page.getByRole('dialog')).toContainText(domain)
+      })
+    }
+  }
 })
