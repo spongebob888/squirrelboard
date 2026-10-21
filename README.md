@@ -94,6 +94,10 @@ Deploy the generated `dist/` directory behind a same-origin reverse proxy. [depl
 
 `pnpm preview` inherits Vite's configured API proxy, so the same empty-address setup works for a local build preview. For example, use `SHADOWQUIC_API_URL=http://192.168.7.1:9090 corepack pnpm preview` to preview against the router. A `dist/` directory served by a separate static server does not include Vite's proxy; use the Nginx configuration for that deployment.
 
+## Releases
+
+Push a tag starting with `v` (for example, `v0.1.0`) to run [.github/workflows/release.yml](.github/workflows/release.yml). The workflow installs the pinned dependencies, runs tests, builds the dashboard, and publishes a GitHub release with `dist.zip` attached. The archive contains the contents of `dist/` at its root and uses the default `/` base path. Extract it into your web server's document root and configure the API proxy as described above. Rerunning the workflow updates the archive on the existing release.
+
 ## GitHub Pages
 
 [.github/workflows/pages.yml](.github/workflows/pages.yml) installs the pinned pnpm version, runs tests, builds the dashboard, and deploys `dist/` on pushes to `main`. Pull requests to `main` run the same checks without deploying. You can also run the workflow manually on `main` from the Actions tab.
