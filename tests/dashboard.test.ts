@@ -111,14 +111,14 @@ test('URL settings override saved settings before the first request and survive 
   const requests = mockApiRequests(t)
   const secret = 'token&with+reserved?characters#=/%'
   const params = new URLSearchParams({ protocol: 'http', hostname: 'router.test', port: '9090', secret, unrelated: 'keep' })
-  const dashboard = mountDashboard(t, `http://localhost/squirrelboard/?${params}#connections`, saved)
+  const dashboard = mountDashboard(t, `http://localhost/squirrelboard/?keep=query#connections?${params}`, saved)
   await dashboard.refresh()
   assert.equal(dashboard.status.value, 'connected')
   assert.deepEqual(dashboard.backend.value, { ...saved, url: 'http://router.test:9090', secret })
   assert.equal(requests.length, 5)
   assert.ok(requests.every(request => request.url.startsWith('http://router.test:9090/api/v1/')))
   assert.ok(requests.every(request => request.authorization === `Bearer ${secret}`))
-  assert.ok(requests.every(request => request.pageUrl === 'http://localhost/squirrelboard/?unrelated=keep#connections'))
+  assert.ok(requests.every(request => request.pageUrl === 'http://localhost/squirrelboard/?keep=query#connections?unrelated=keep'))
   assert.equal(sessionStorage.getItem('squirrelboard.secret'), secret)
   assert.deepEqual(JSON.parse(localStorage.getItem('squirrelboard.backend')!), { name: saved.name, url: 'http://router.test:9090', interval: saved.interval })
 
@@ -137,7 +137,7 @@ test('URL settings override saved settings before the first request and survive 
 
 test('a URL selecting a different server never reuses the saved secret', async t => {
   const requests = mockApiRequests(t)
-  const dashboard = mountDashboard(t, 'http://localhost/?protocol=http&hostname=other.test&port=9090', saved)
+  const dashboard = mountDashboard(t, 'http://localhost/#protocol=http&hostname=other.test&port=9090', saved)
   await dashboard.refresh()
   assert.equal(dashboard.backend.value.secret, '')
   assert.equal(sessionStorage.getItem('squirrelboard.secret'), null)
@@ -146,7 +146,7 @@ test('a URL selecting a different server never reuses the saved secret', async t
 
 test('an equivalent API address keeps its tab secret when no secret is supplied', async t => {
   const requests = mockApiRequests(t)
-  const dashboard = mountDashboard(t, 'http://localhost/?protocol=http&hostname=SAVED.test&port=9090', saved)
+  const dashboard = mountDashboard(t, 'http://localhost/#protocol=http&hostname=SAVED.test&port=9090', saved)
   await dashboard.refresh()
   assert.equal(dashboard.backend.value.secret, saved.secret)
   assert.ok(requests.every(request => request.authorization === `Bearer ${saved.secret}`))
@@ -154,15 +154,23 @@ test('an equivalent API address keeps its tab secret when no secret is supplied'
 
 test('a secret-only URL configures the saved server', async t => {
   const requests = mockApiRequests(t)
-  const dashboard = mountDashboard(t, 'http://localhost/?secret=replacement', saved)
+  const dashboard = mountDashboard(t, 'http://localhost/#secret=replacement', saved)
   await dashboard.refresh()
   assert.equal(dashboard.backend.value.url, saved.url)
   assert.ok(requests.every(request => request.authorization === 'Bearer replacement'))
 })
 
+test('connection settings are read only from the fragment', async t => {
+  const requests = mockApiRequests(t)
+  const dashboard = mountDashboard(t, 'http://localhost/?protocol=https&hostname=ignored.test&port=9443&secret=ignored#connections', saved)
+  await dashboard.refresh()
+  assert.deepEqual(dashboard.backend.value, saved)
+  assert.ok(requests.every(request => request.url.startsWith(`${saved.url}/api/v1/`) && request.authorization === `Bearer ${saved.secret}`))
+})
+
 test('empty URL parameters select the same-origin proxy and clear authentication', async t => {
   const requests = mockApiRequests(t)
-  const dashboard = mountDashboard(t, 'http://localhost/?hostname=&secret=', saved)
+  const dashboard = mountDashboard(t, 'http://localhost/#hostname=&secret=', saved)
   await dashboard.refresh()
   assert.equal(dashboard.backend.value.url, '')
   assert.equal(dashboard.backend.value.secret, '')
@@ -171,7 +179,7 @@ test('empty URL parameters select the same-origin proxy and clear authentication
 
 test('invalid URL addresses stop polling and can be corrected through Settings', async t => {
   const requests = mockApiRequests(t)
-  const dashboard = mountDashboard(t, 'http://localhost/?protocol=javascript&hostname=router.test&secret=new-secret#settings', saved)
+  const dashboard = mountDashboard(t, 'http://localhost/#settings?protocol=javascript&hostname=router.test&secret=new-secret', saved)
   await dashboard.refresh()
   assert.equal(requests.length, 0)
   assert.equal(dashboard.status.value, 'offline')
@@ -184,22 +192,34 @@ test('invalid URL addresses stop polling and can be corrected through Settings',
 
 test('demo URL settings remain isolated from the API until leaving demo', async t => {
   const requests = mockApiRequests(t)
-  const dashboard = mountDashboard(t, 'http://localhost/?demo=1&hostname=demo.test&secret=demo-secret', saved)
+  const dashboard = mountDashboard(t, 'http://localhost/#connections?demo=1&hostname=demo.test&secret=demo-secret', saved)
   await dashboard.refresh()
   assert.equal(requests.length, 0)
-  assert.equal(location.search, '?demo=1')
+  assert.equal(location.hash, '#connections?demo=1')
   await dashboard.reset(false)
+  assert.equal(location.hash, '#connections')
   assert.ok(requests.length > 0)
   assert.ok(requests.every(request => request.url.startsWith('http://demo.test/api/v1/') && request.authorization === 'Bearer demo-secret'))
 })
 
+test('demo toggles preserve the page and unrelated parameters in the fragment', async t => {
+  mockApiRequests(t)
+  const dashboard = mountDashboard(t, 'http://localhost/?keep=query#traffic?keep=fragment', saved)
+  await dashboard.refresh()
+  await dashboard.reset(true)
+  assert.equal(location.href, 'http://localhost/?keep=query#traffic?keep=fragment&demo=1')
+  await dashboard.reset(false)
+  assert.equal(location.href, 'http://localhost/?keep=query#traffic?keep=fragment')
+})
+
 test('URL settings work when browser storage is unavailable', async t => {
   const requests = mockApiRequests(t)
-  const dashboard = mountDashboard(t, 'http://localhost/?protocol=https&hostname=router.test&secret=url-secret', undefined, true)
+  const dashboard = mountDashboard(t, 'http://localhost/#protocol=https&hostname=router.test&secret=url-secret', undefined, true)
   await dashboard.refresh()
   assert.equal(dashboard.status.value, 'connected')
   assert.match(dashboard.notice.value, /Browser storage is unavailable/)
   assert.equal(location.search, '')
+  assert.equal(location.hash, '')
   assert.ok(requests.every(request => request.url.startsWith('https://router.test/api/v1/') && request.authorization === 'Bearer url-secret'))
 })
 
@@ -215,7 +235,7 @@ test('hostname parameters support protocol defaults, explicit ports, and IPv6', 
   for (const [query, expected] of cases) {
     await t.test(query!, async t => {
       const requests = mockApiRequests(t)
-      const dashboard = mountDashboard(t, `http://localhost/?${query}`, saved)
+      const dashboard = mountDashboard(t, `http://localhost/#?${query}`, saved)
       await dashboard.refresh()
       assert.equal(dashboard.status.value, 'connected')
       assert.equal(dashboard.backend.value.url, expected)
@@ -247,7 +267,7 @@ test('malformed address fields never send requests or overwrite saved credential
   for (const query of queries) {
     await t.test(query, async t => {
       const requests = mockApiRequests(t)
-      const dashboard = mountDashboard(t, `http://localhost/?${query}&secret=new-secret`, saved)
+      const dashboard = mountDashboard(t, `http://localhost/#?${query}&secret=new-secret`, saved)
       await dashboard.refresh()
       assert.equal(requests.length, 0)
       assert.equal(dashboard.status.value, 'offline')
@@ -255,6 +275,7 @@ test('malformed address fields never send requests or overwrite saved credential
       assert.equal(sessionStorage.getItem('squirrelboard.secret'), saved.secret)
       assert.equal(JSON.parse(localStorage.getItem('squirrelboard.backend')!).url, saved.url)
       assert.equal(location.search, '')
+      assert.equal(location.hash, '')
     })
   }
 })

@@ -78,8 +78,14 @@ test('invalid tokens show an actionable authentication error', async ({ page }) 
   expect(await page.evaluate(() => localStorage.getItem('squirrelboard.backend'))).not.toContain('fixture-secret')
 })
 
-test('URL settings connect immediately, populate Settings, and are consumed once', async ({ page }) => {
-  await page.goto('/?protocol=http&hostname=127.0.0.1&port=4173&secret=fixture-secret#settings')
+test('fragment settings stay out of requests, populate Settings, and are consumed once', async ({ page }) => {
+  const documentUrls: string[] = []
+  const referrers: string[] = []
+  page.on('request', request => {
+    if (request.isNavigationRequest()) documentUrls.push(request.url())
+    referrers.push(request.headers()['referer'] ?? '')
+  })
+  await page.goto('/#settings?protocol=http&hostname=127.0.0.1&port=4173&secret=fixture-secret')
   await expect(page.getByText('Backend connected', { exact: true })).toBeVisible()
   await expect(page.getByLabel('API address', { exact: false })).toHaveValue('http://127.0.0.1:4173')
   await expect(page.getByLabel('API secret', { exact: false })).toHaveValue('fixture-secret')
@@ -92,6 +98,9 @@ test('URL settings connect immediately, populate Settings, and are consumed once
   await page.reload()
   await expect(page.getByText('Backend connected', { exact: true })).toBeVisible()
   await expect(page.getByLabel('API address', { exact: false })).toHaveValue('')
+  expect(documentUrls.length).toBeGreaterThan(0)
+  expect(documentUrls.every(url => url === 'http://127.0.0.1:4173/')).toBe(true)
+  expect(referrers.every(value => !value.includes('fixture-secret') && !value.includes('hostname='))).toBe(true)
 })
 
 test('demo is isolated from the backend and supports mobile navigation and themes', async ({ page, request }) => {

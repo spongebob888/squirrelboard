@@ -9,6 +9,7 @@ import ConnectionCards from './components/ConnectionCards.vue'
 import { useDashboard } from './composables/dashboard'
 import { bytes, duration, packetLossRate } from './lib/metrics'
 import { validateProbeUrl } from './lib/api'
+import { formatFragment, parseFragment } from './lib/location'
 import type { Backend, Connection, Outbound } from './lib/types'
 
 const logoUrl = `${import.meta.env.BASE_URL}favicon.svg`
@@ -21,10 +22,10 @@ const pages = [
   { name: 'Traffic' as Page, icon: Activity },
   { name: 'Settings' as Page, icon: Settings2 },
 ]
-const hashPage = () => pages.find(p => p.name.toLowerCase() === location.hash.slice(1))?.name || 'Overview'
+const hashPage = () => pages.find(p => p.name.toLowerCase() === parseFragment(location.hash).page)?.name || 'Overview'
 const page = ref<Page>(hashPage())
 const sidebarOpen = ref(false)
-function navigate(name: Page) { page.value = name; location.hash = name.toLowerCase(); sidebarOpen.value = false }
+function navigate(name: Page) { page.value = name; location.hash = formatFragment(name.toLowerCase(), parseFragment(location.hash).params); sidebarOpen.value = false }
 const onHash = () => page.value = hashPage()
 window.addEventListener('hashchange', onHash)
 onBeforeUnmount(() => window.removeEventListener('hashchange', onHash))

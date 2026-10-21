@@ -3,6 +3,7 @@ import { ApiError, ShadowquicApi, normalizeBase } from '../lib/api.ts'
 import { demoHistory, demoProbe, demoSelect, demoSnapshot } from '../lib/demo.ts'
 import { rates, totals } from '../lib/metrics.ts'
 import { ConnectionLatencyHistory } from '../lib/latency.ts'
+import { formatFragment, parseFragment } from '../lib/location.ts'
 import type { Backend, LatencySample, Outbound, Sample, Snapshot } from '../lib/types.ts'
 
 const empty = (): Snapshot => ({ outbounds: [], connections: [], inbounds: [], memory: null, memoryNote: '', tokioMetric: null, tokioMetricNote: '' })
@@ -37,8 +38,9 @@ function addressFromParams(params: URLSearchParams): string {
 
 export function useDashboard() {
   const backend = ref(savedBackend())
-  const params = new URLSearchParams(location.search)
-  const demo = ref(params.get('demo') === '1')
+  const fragment = parseFragment(location.hash)
+  const params = fragment.params
+  const demo = ref(params.get('demo') === '1' || new URLSearchParams(location.search).get('demo') === '1')
   let startupError = ''
   let storageUnavailable = false
   const hasAddress = ['protocol', 'hostname', 'port'].some(key => params.has(key))
@@ -54,7 +56,8 @@ export function useDashboard() {
       startupError = 'Invalid server address in URL. Use protocol=http or https, a hostname, and a port from 1 to 65535, or correct the API address in Settings.'
     }
     const url = new URL(location.href)
-    for (const key of ['protocol', 'hostname', 'port', 'secret']) url.searchParams.delete(key)
+    for (const key of ['protocol', 'hostname', 'port', 'secret']) params.delete(key)
+    url.hash = formatFragment(fragment.page, params)
     window.history.replaceState(window.history.state, '', url)
   }
   const data = ref<Snapshot>(empty())
@@ -152,8 +155,11 @@ export function useDashboard() {
     probing.value = new Set()
     selecting.value = new Set()
     const url = new URL(location.href)
-    if (isDemo) url.searchParams.set('demo', '1')
-    else url.searchParams.delete('demo')
+    const fragment = parseFragment(url.hash)
+    url.searchParams.delete('demo')
+    if (isDemo) fragment.params.set('demo', '1')
+    else fragment.params.delete('demo')
+    url.hash = formatFragment(fragment.page, fragment.params)
     window.history.replaceState({}, '', url)
     await refresh()
   }

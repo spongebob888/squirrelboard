@@ -39,17 +39,19 @@ SHADOWQUIC_API_URL=http://192.168.7.1:9090 corepack pnpm dev
 
 Enter the server's API secret in Settings when required. Restart Vite after changing the environment variable or `.env.local`. `127.0.0.1` in the proxy target refers to the machine running Vite; in an explicit API address, it refers to the machine running the browser.
 
-You can also configure the connection when opening the dashboard with the `protocol`, `hostname`, `port`, and `secret` query parameters:
+You can also configure the connection when opening the dashboard with the `protocol`, `hostname`, `port`, and `secret` parameters after `#`:
 
 ```text
-https://spongebob888.github.io/squirrelboard/?protocol=http&hostname=192.168.7.1&port=9090&secret=your-secret#connections
+https://spongebob888.github.io/squirrelboard/#connections?protocol=http&hostname=192.168.7.1&port=9090&secret=your-secret
 ```
 
 Use `protocol=http` or `protocol=https` (default: `http`), a hostname or IP address without a scheme, path, or port, and an optional port from 1 to 65535. Omitting `port` uses the protocol's standard port (80 for HTTP, 443 for HTTPS). IPv6 addresses work with or without brackets. These fields construct a new API address and use the same browser connection rules as Settings. Use `hostname=` by itself for the same-origin proxy and `secret=` for no authentication. Supplying only `secret` updates the saved server's token. Selecting a different API address clears the old server's secret unless a new one is supplied. `demo=1` still keeps the dashboard in demo mode.
 
-Ordinary hostnames and IPv4 addresses need no escaping. Secrets containing `&`, `+`, `#`, or `%` still need URL encoding; you can build the query with `new URLSearchParams({ protocol: 'http', hostname: '192.168.7.1', port: '9090', secret: 'your-secret' })`.
+Everything after `#` is a URL fragment and is not sent to the dashboard hosting server in HTTP requests or referrer headers. The page name is optional: `/#protocol=http&hostname=192.168.7.1&port=9090&secret=your-secret` opens Overview. Connection parameters before `#` are ignored. Existing `?demo=1` links remain supported; new demo links can use `#overview?demo=1`.
 
-These settings apply before the first API request and populate Settings automatically. The address is saved as a browser preference; the secret stays in this tab's session storage. All four parameters are removed from the address bar after reading, preserving other parameters and the page fragment. Reloading uses the saved settings. An invalid address shows an error and sends no API requests until corrected in Settings.
+Ordinary hostnames and IPv4 addresses need no escaping. Secrets containing `&`, `+`, `#`, or `%` still need URL encoding; you can build the fragment parameters with `new URLSearchParams({ protocol: 'http', hostname: '192.168.7.1', port: '9090', secret: 'your-secret' })` and append them after `#connections?`.
+
+These settings apply before the first API request and populate Settings automatically. The address is saved as a browser preference; the secret stays in this tab's session storage. All four connection parameters are removed from the fragment after reading, preserving the page name and other parameters. Reloading uses the saved settings. An invalid address shows an error and sends no API requests until corrected in Settings.
 
 To distinguish network/listener failures from browser CORS failures, run this on the machine running the dashboard server:
 
