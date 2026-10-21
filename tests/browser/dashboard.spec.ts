@@ -78,6 +78,22 @@ test('invalid tokens show an actionable authentication error', async ({ page }) 
   expect(await page.evaluate(() => localStorage.getItem('squirrelboard.backend'))).not.toContain('fixture-secret')
 })
 
+test('URL settings connect immediately, populate Settings, and are consumed once', async ({ page }) => {
+  await page.goto('/?protocol=http&hostname=127.0.0.1&port=4173&secret=fixture-secret#settings')
+  await expect(page.getByText('Backend connected', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('API address', { exact: false })).toHaveValue('http://127.0.0.1:4173')
+  await expect(page.getByLabel('API secret', { exact: false })).toHaveValue('fixture-secret')
+  await expect(page).toHaveURL('http://127.0.0.1:4173/#settings')
+  expect(await page.evaluate(() => localStorage.getItem('squirrelboard.backend'))).not.toContain('fixture-secret')
+
+  await page.getByLabel('API address', { exact: false }).fill('')
+  await page.getByRole('button', { name: 'Save & connect' }).click()
+  await expect(page.getByText('Connected. Your backend settings are saved.')).toBeVisible()
+  await page.reload()
+  await expect(page.getByText('Backend connected', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('API address', { exact: false })).toHaveValue('')
+})
+
 test('demo is isolated from the backend and supports mobile navigation and themes', async ({ page, request }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/?demo=1')

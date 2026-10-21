@@ -13,9 +13,50 @@ function savedBackend(): Backend {
   } catch { return { name: 'Local Shadowquic', url: '', secret: '', interval: 2000 } }
 }
 
+function storeBackend(backend: Backend) {
+  const { secret, ...preferences } = backend
+  localStorage.setItem('squirrelboard.backend', JSON.stringify(preferences))
+  if (secret) sessionStorage.setItem('squirrelboard.secret', secret)
+  else sessionStorage.removeItem('squirrelboard.secret')
+}
+
+function addressFromParams(params: URLSearchParams): string {
+  const hostname = params.get('hostname')?.trim()
+  const protocol = (params.get('protocol') ?? 'http').trim().toLowerCase()
+  const port = (params.get('port') ?? '').trim()
+  if (hostname === undefined) throw new Error('A hostname is required.')
+  if (!hostname) {
+    if (params.has('protocol') || params.has('port')) throw new Error('A hostname is required.')
+    return ''
+  }
+  if (!['http', 'https'].includes(protocol) || /[/\\?#@\s%]/.test(hostname)) throw new Error('Invalid server address.')
+  if (port && (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535)) throw new Error('Invalid port.')
+  const host = hostname.includes(':') && !(hostname.startsWith('[') && hostname.endsWith(']')) ? `[${hostname}]` : hostname
+  return normalizeBase(`${protocol}://${host}${port ? `:${port}` : ''}`)
+}
+
 export function useDashboard() {
   const backend = ref(savedBackend())
-  const demo = ref(new URLSearchParams(location.search).get('demo') === '1')
+  const params = new URLSearchParams(location.search)
+  const demo = ref(params.get('demo') === '1')
+  let startupError = ''
+  let storageUnavailable = false
+  const hasAddress = ['protocol', 'hostname', 'port'].some(key => params.has(key))
+  const secret = params.get('secret')
+  if (hasAddress || secret !== null) {
+    const previous = backend.value
+    backend.value = { ...previous, url: params.get('hostname') ?? previous.url, secret: secret ?? '' }
+    try {
+      backend.value.url = hasAddress ? addressFromParams(params) : previous.url
+      if (secret === null && backend.value.url === previous.url) backend.value.secret = previous.secret
+      try { storeBackend(backend.value) } catch { storageUnavailable = true }
+    } catch {
+      startupError = 'Invalid server address in URL. Use protocol=http or https, a hostname, and a port from 1 to 65535, or correct the API address in Settings.'
+    }
+    const url = new URL(location.href)
+    for (const key of ['protocol', 'hostname', 'port', 'secret']) url.searchParams.delete(key)
+    window.history.replaceState(window.history.state, '', url)
+  }
   const data = ref<Snapshot>(empty())
   const history = ref<Sample[]>([])
   const latencySamples = shallowRef<LatencySample[]>([])
@@ -50,6 +91,11 @@ export function useDashboard() {
   }
 
   function refresh(): Promise<void> {
+    if (startupError && !demo.value) {
+      status.value = 'offline'
+      error.value = startupError
+      return Promise.resolve()
+    }
     if (refreshing) return refreshing
     const current = generation
     const signal = controller.signal
@@ -114,12 +160,9 @@ export function useDashboard() {
 
   async function connect(config: Backend) {
     backend.value = { ...config, name: config.name.trim() || 'Shadowquic', url: normalizeBase(config.url) }
-    try {
-      const { secret, ...preferences } = backend.value
-      localStorage.setItem('squirrelboard.backend', JSON.stringify(preferences))
-      if (secret) sessionStorage.setItem('squirrelboard.secret', secret)
-      else sessionStorage.removeItem('squirrelboard.secret')
-    } catch { toast('Browser storage is unavailable. Settings will last for this page only.') }
+    startupError = ''
+    try { storeBackend(backend.value) }
+    catch { toast('Browser storage is unavailable. Settings will last for this page only.') }
     await reset(false)
     return status.value === 'connected'
   }
@@ -170,6 +213,7 @@ export function useDashboard() {
     if (!document.hidden && !paused.value) { prior = null; void refresh() }
   }
   document.addEventListener('visibilitychange', visibility)
+  if (storageUnavailable) toast('Browser storage is unavailable. Settings will last for this page only.')
   if (demo.value) history.value = demoHistory()
   void refresh()
   onBeforeUnmount(() => {
