@@ -39,6 +39,9 @@ jobs:
       - name: Build dashboard
         run: pnpm build
 
+      - name: Build single-file dashboard
+        run: pnpm build:single
+
       - name: Package dashboard
         working-directory: dist
         run: zip -r ../dist.zip .
@@ -50,7 +53,7 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" dist.zip --clobber
+            gh release upload "$RELEASE_TAG" dist.zip dist-single/index.html --clobber
           else
-            gh release create "$RELEASE_TAG" dist.zip --verify-tag --title "$RELEASE_TAG" --generate-notes
+            gh release create "$RELEASE_TAG" dist.zip dist-single/index.html --verify-tag --title "$RELEASE_TAG" --generate-notes
           fi

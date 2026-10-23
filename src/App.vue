@@ -10,9 +10,8 @@ import { useDashboard } from './composables/dashboard'
 import { bytes, duration, packetLossRate } from './lib/metrics'
 import { validateProbeUrl } from './lib/api'
 import { formatFragment, parseFragment } from './lib/location'
+import logoUrl from '../public/favicon.svg?inline'
 import type { Backend, Connection, Outbound } from './lib/types'
-
-const logoUrl = `${import.meta.env.BASE_URL}favicon.svg`
 
 type Page = 'Overview' | 'Outbounds' | 'Connections' | 'Traffic' | 'Settings'
 const pages = [

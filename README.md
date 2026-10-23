@@ -94,9 +94,22 @@ Deploy the generated `dist/` directory behind a same-origin reverse proxy. [depl
 
 `pnpm preview` inherits Vite's configured API proxy, so the same empty-address setup works for a local build preview. For example, use `SHADOWQUIC_API_URL=http://192.168.7.1:9090 corepack pnpm preview` to preview against the router. A `dist/` directory served by a separate static server does not include Vite's proxy; use the Nginx configuration for that deployment.
 
+To generate a single-file bundle:
+
+```sh
+corepack pnpm build:single
+```
+
+The output is `dist-single/index.html`, with JavaScript, CSS, and the dashboard icon embedded. It needs no companion asset files and can be served at any path or opened directly in a browser. Open `index.html#overview?demo=1` to explore without a backend. For live data, configure a browser-accessible API address and secret in Settings or the URL fragment; API requests still follow the browser's CORS and HTTPS rules. The normal `dist/` build is preserved.
+
 ## Releases
 
-Push a tag starting with `v` (for example, `v0.1.0`) to run [.github/workflows/release.yml](.github/workflows/release.yml). The workflow installs the pinned dependencies, runs tests, builds the dashboard, and publishes a GitHub release with `dist.zip` attached. The archive contains the contents of `dist/` at its root and uses the default `/` base path. Extract it into your web server's document root and configure the API proxy as described above. Rerunning the workflow updates the archive on the existing release.
+Push a tag starting with `v` (for example, `v0.1.0`) to run [.github/workflows/release.yml](.github/workflows/release.yml). The workflow installs the pinned dependencies, runs tests, builds both dashboard formats, and publishes a GitHub release with two assets:
+
+- `dist.zip`: the contents of `dist/` at the archive root, using the default `/` base path. Extract it into your web server's document root and configure the API proxy as described above.
+- `index.html`: the single-file dashboard, uploaded directly without compression. Download it and open it in a browser or serve it from your web server.
+
+Rerunning the workflow updates both assets on the existing release.
 
 ## GitHub Pages
 
