@@ -155,7 +155,7 @@ function exportConnections() {
       <div class="sidebar-bottom">
         <div class="sidebar-traffic"><div class="eyebrow">LIVE TRAFFIC <span class="status-dot" :class="{ online: status === 'connected' && !paused }"/></div><div class="sidebar-speeds"><span><ArrowDown :size="13"/>{{ bytes(speed.download) }}<small>/s</small></span><span><ArrowUp :size="13"/>{{ bytes(speed.upload) }}<small>/s</small></span></div><TrafficChart :samples="history" compact/></div>
         <button class="backend-switch" @click="openSettings()"><span class="server-avatar"><Server :size="17"/></span><span><strong>{{ demo ? 'Demo workspace' : backend.name }}</strong><small><i class="status-dot" :class="{ online: status === 'connected' }"/>{{ demo ? 'Sample data' : status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting' : 'Disconnected' }}</small></span><ChevronDown :size="14"/></button>
-        <div class="sidebar-footer"><span>v0.1.0</span><a href="https://github.com/Zephyruso/zashboard" target="_blank" rel="noreferrer" title="Design inspired by Zashboard"><CircleHelp :size="17"/><span class="sr-only">Zashboard design reference</span></a><button :aria-label="dark ? 'Use light theme' : 'Use dark theme'" @click="dark = !dark"><Sun v-if="dark" :size="17"/><Moon v-else :size="17"/></button></div>
+        <div class="sidebar-footer"><span>v0.1.2</span><a href="https://github.com/Zephyruso/zashboard" target="_blank" rel="noreferrer" title="Design inspired by Zashboard"><CircleHelp :size="17"/><span class="sr-only">Zashboard design reference</span></a><button :aria-label="dark ? 'Use light theme' : 'Use dark theme'" @click="dark = !dark"><Sun v-if="dark" :size="17"/><Moon v-else :size="17"/></button></div>
       </div>
     </aside>
 

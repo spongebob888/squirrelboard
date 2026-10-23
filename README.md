@@ -104,7 +104,7 @@ The output is `dist-single/index.html`, with JavaScript, CSS, and the dashboard 
 
 ## Releases
 
-Push a tag starting with `v` (for example, `v0.1.0`) to run [.github/workflows/release.yml](.github/workflows/release.yml). The workflow installs the pinned dependencies, runs tests, builds both dashboard formats, and publishes a GitHub release with two assets:
+Push a tag starting with `v` (for example, `v0.1.2`) to run [.github/workflows/release.yml](.github/workflows/release.yml). The workflow installs the pinned dependencies, runs tests, builds both dashboard formats, and publishes a GitHub release with two assets:
 
 - `dist.zip`: the contents of `dist/` at the archive root, using the default `/` base path. Extract it into your web server's document root and configure the API proxy as described above.
 - `index.html`: the single-file dashboard, uploaded directly without compression. Download it and open it in a browser or serve it from your web server.
