@@ -26,12 +26,16 @@ const server = http.createServer(async (req, res) => {
   if (offline) return json({ error: { code: 'unavailable', message: 'Fixture backend unavailable' } }, 503)
   if (req.url === '/api/v1/outbounds') return json({ outbounds: [
     { tag: selector, selector: { selected, outbounds: [member, 'direct'] }, quality: { sq_conn_stats: null, probe: null } },
-    { tag: member, quality: { sq_conn_stats: null, probe } },
+    { tag: member, quality: { sq_conn_stats: {
+      uplink: { rtt: 42, current_mtu: 1400, sent_packets: 1000, lost_packets: 2 },
+      downlink: { rtt: 44, current_mtu: 1400, sent_packets: 2000, lost_packets: 3 },
+      sample_age_ms: 2000, duration_ms: 3661000,
+    }, probe } },
     { tag: 'direct', quality: { sq_conn_stats: null, probe: null } },
   ] })
   if (req.url === '/api/v1/connections') return json({ connections: [
-    { id: '1', protocol: 'tcp', inbound: 'mixed', outbound: selector, src: '[::1]:54321', dst_ip: null, dst_domain: 'github.com', dst_port: 443, upload_bytes: 1024, download_bytes: download, duration_ms: 15000, first_response_ms: 45, half_closed: false },
-    { id: '2', protocol: 'udp', inbound: 'tun', outbound: null, src: null, dst_ip: null, dst_domain: null, dst_port: null, upload_bytes: null, download_bytes: 512, duration_ms: null, first_response_ms: null, half_closed: true },
+    { id: '1', protocol: 'tcp', inbound: 'mixed', outbound: selector, src: '[::1]:54321', dst_ip: null, dst_domain: 'github.com', dst_port: 443, upload_bytes: 1024, download_bytes: download, duration_ms: 15000, first_response_ms: 45, half_closed: false, sniffer: { domain: 'sniffed.example', protocol: 'tls', version: '1.3' } },
+    { id: '2', protocol: 'udp', inbound: 'tun', outbound: null, src: null, dst_ip: null, dst_domain: null, dst_port: null, upload_bytes: null, download_bytes: 512, duration_ms: null, first_response_ms: null, half_closed: true, sniffer: null },
   ] })
   if (req.url === '/api/v1/traffic') {
     download += 10240

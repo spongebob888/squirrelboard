@@ -19,6 +19,7 @@ export function demoSnapshot(): Snapshot {
         uplink: { rtt: latencies[i]!, current_mtu: 1400, sent_packets: 32481, lost_packets: 16 },
         downlink: { rtt: latencies[i]! + 2, current_mtu: 1400, sent_packets: 186320, lost_packets: 92 },
         sample_age_ms: 800,
+        duration_ms: 3600000 + i * 120000 + elapsed * 1000,
       } : null,
     },
   }))
@@ -29,6 +30,7 @@ export function demoSnapshot(): Snapshot {
     dst_ip: i % 2 === 0 ? `104.18.${i + 1}.12` : null, dst_domain: domains[i % domains.length]!, dst_port: 443,
     upload_bytes: 24182 + i * 18793 + Math.floor(elapsed * 420), download_bytes: 394831 + i * 124981 + Math.floor(elapsed * 34980),
     duration_ms: 12000 + i * 18400 + elapsed * 1000, first_response_ms: 28 + i * 3, half_closed: i === 23,
+    sniffer: i === 23 ? null : { domain: domains[i % domains.length]!, protocol: i % 5 === 0 ? 'quic' : 'tls', version: i % 5 === 0 ? '1' : '1.3' },
   }))
   return {
     outbounds, connections,

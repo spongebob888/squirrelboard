@@ -42,14 +42,64 @@ test('connection filters and half-closed details handle null fields', async ({ p
   await expect(page.locator('tbody tr')).toHaveCount(2)
   await page.getByLabel('Search connections').fill('github')
   await expect(page.locator('tbody tr')).toHaveCount(1)
+  await page.locator('tbody tr').click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.locator('dt').filter({ hasText: /^Protocol$/ }).locator('+ dd')).toHaveText('TCP')
+  await expect(dialog.locator('dt').filter({ hasText: /^Destination domain$/ }).locator('+ dd')).toHaveText('github.com')
+  await expect(dialog.locator('dt').filter({ hasText: /^Sniffed domain$/ }).locator('+ dd')).toHaveText('sniffed.example')
+  await expect(dialog.locator('dt').filter({ hasText: /^Sniffed protocol$/ }).locator('+ dd')).toHaveText('TLS')
+  await expect(dialog.locator('dt').filter({ hasText: /^Sniffed version$/ }).locator('+ dd')).toHaveText('1.3')
+  await page.getByRole('button', { name: 'Close details' }).click()
   await page.getByLabel('Search connections').clear()
   await page.getByLabel('Filter protocol').selectOption('udp')
   await expect(page.locator('tbody tr')).toHaveCount(1)
   await page.locator('tbody tr').click()
   await expect(page.getByRole('dialog')).toContainText('Half-closed')
   await expect(page.getByRole('dialog')).toContainText('Waiting / unavailable')
+  await expect(dialog.locator('dt').filter({ hasText: /^Sniffed / }).locator('+ dd')).toHaveText(['—', '—', '—'])
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).not.toBeVisible()
+})
+
+test('outbound quality separates SQ connection duration from sample age, including zero', async ({ page }) => {
+  await page.goto('/#outbounds')
+  const card = page.locator('.all-outbounds .outbound-card').filter({ hasText: 'Tokyo / 東京' })
+  await card.getByRole('button', { name: 'Tokyo / 東京 QUIC transport' }).click()
+  const dialog = page.getByRole('dialog')
+  const connectionDuration = dialog.locator('dt').filter({ hasText: /^SQ connection duration$/ }).locator('+ dd')
+  await expect(connectionDuration).toHaveText('1h 1m')
+  await expect(dialog.locator('dt').filter({ hasText: /^Sample age$/ }).locator('+ dd')).toHaveText('2s')
+  await page.getByRole('button', { name: 'Close details' }).click()
+
+  await page.route('**/api/v1/outbounds', async route => {
+    const response = await route.fetch()
+    const body = await response.json()
+    body.outbounds.find((o: any) => o.quality.sq_conn_stats).quality.sq_conn_stats.duration_ms = 0
+    await route.fulfill({ response, json: body })
+  })
+  await page.reload()
+  await card.getByRole('button', { name: 'Tokyo / 東京 QUIC transport' }).click()
+  await expect(connectionDuration).toHaveText('0s')
+})
+
+test('details remain usable when older backends omit duration and sniffer fields', async ({ page }) => {
+  await page.route(/\/api\/v1\/(outbounds|connections)$/, async route => {
+    const response = await route.fetch()
+    const body = await response.json()
+    for (const outbound of body.outbounds ?? []) {
+      if (outbound.quality.sq_conn_stats) delete outbound.quality.sq_conn_stats.duration_ms
+    }
+    for (const connection of body.connections ?? []) delete connection.sniffer
+    await route.fulfill({ response, json: body })
+  })
+  await page.goto('/#outbounds')
+  await page.locator('.all-outbounds .outbound-card').filter({ hasText: 'Tokyo / 東京' }).getByRole('button', { name: 'Tokyo / 東京 QUIC transport' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.locator('dt').filter({ hasText: /^SQ connection duration$/ }).locator('+ dd')).toHaveText('—')
+  await page.getByRole('button', { name: 'Close details' }).click()
+  await page.getByRole('navigation').getByRole('button', { name: 'Connections' }).click()
+  await page.getByRole('button', { name: 'Inspect connection to github.com', exact: true }).click()
+  await expect(dialog.locator('dt').filter({ hasText: /^Sniffed / }).locator('+ dd')).toHaveText(['—', '—', '—'])
 })
 
 test('failed probes and offline polling retain clear failure states', async ({ page, request }) => {

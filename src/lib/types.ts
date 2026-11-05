@@ -15,7 +15,7 @@ export interface DirectionQuality {
 export interface Outbound {
   tag: string
   quality: {
-    sq_conn_stats: { uplink: DirectionQuality; downlink: DirectionQuality; sample_age_ms: number } | null
+    sq_conn_stats: { uplink: DirectionQuality; downlink: DirectionQuality; sample_age_ms: number; duration_ms?: number } | null
     probe: Probe | null
   }
   selector?: { selected: string; outbounds: string[] }
@@ -34,6 +34,7 @@ export interface Connection {
   duration_ms: number | null
   first_response_ms: number | null
   half_closed: boolean
+  sniffer?: { domain: string; protocol: 'http' | 'tls' | 'quic'; version: string } | null
 }
 export interface InboundTraffic {
   inbound: string

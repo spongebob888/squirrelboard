@@ -65,8 +65,8 @@ curl --noproxy '*' -i http://192.168.7.1:9090/api/v1/outbounds
 ## Features
 
 - Download/upload rates and a rolling two-minute traffic chart.
-- Outbound selectors, individual and bulk HTTP probes, and cached QUIC RTT, packet loss, MTU, and sample age.
-- Searchable, filterable, paginated connections, session details, and JSON export.
+- Outbound selectors, individual and bulk HTTP probes, and QUIC connection duration, cached RTT, packet loss, MTU, and sample age.
+- Searchable, filterable, paginated connections, session details with sniffed domain, protocol, and version, and JSON export.
 - Cumulative traffic by inbound and protocol, plus optional jemalloc memory statistics.
 - Live Tokio runtime metrics: alive tasks, worker count, and global queue depth.
 - Per-outbound first-response latency distributions with median, P95, average, and 5/15/30-minute views.
