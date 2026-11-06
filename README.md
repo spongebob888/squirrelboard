@@ -13,6 +13,8 @@ corepack pnpm dev
 
 Open the URL printed by Vite, normally `http://127.0.0.1:5173`. The dashboard initially connects to the local API. Use **Explore demo**, or open `http://127.0.0.1:5173/?demo=1`, for a clearly labeled simulated workspace.
 
+The development server listens on `0.0.0.0`, so another device can open `http://<server-ip>:5173`. During an Impeccable live session, the picker uses the same development origin through `/__impeccable`; its helper stays bound to loopback. Production builds omit the injected live-picker script.
+
 Enable the API in your Shadowquic configuration:
 
 ```yaml
@@ -104,7 +106,7 @@ The output is `dist-single/index.html`, with JavaScript, CSS, and the dashboard 
 
 ## Releases
 
-Push a tag starting with `v` (for example, `v0.1.2`) to run [.github/workflows/release.yml](.github/workflows/release.yml). The workflow installs the pinned dependencies, runs tests, builds both dashboard formats, and publishes a GitHub release with two assets:
+Push a tag starting with `v` (for example, `v0.1.3`) to run [.github/workflows/release.yml](.github/workflows/release.yml). The workflow installs the pinned dependencies, runs tests, builds both dashboard formats, and publishes a GitHub release with two assets:
 
 - `dist.zip`: the contents of `dist/` at the archive root, using the default `/` base path. Extract it into your web server's document root and configure the API proxy as described above.
 - `index.html`: the single-file dashboard, uploaded directly without compression. Download it and open it in a browser or serve it from your web server.

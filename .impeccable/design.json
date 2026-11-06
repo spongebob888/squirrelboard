@@ -1,0 +1,598 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-06T04:35:23.475450+00:00",
+  "title": "Design System: Squirrelboard",
+  "extensions": {
+    "colorMeta": {
+      "bg": {
+        "role": "neutral",
+        "displayName": "Canvas",
+        "tonalRamp": [
+          "oklch(0.150 0.0013 264.54)",
+          "oklch(0.250 0.0020 264.54)",
+          "oklch(0.370 0.0026 264.54)",
+          "oklch(0.490 0.0029 264.54)",
+          "oklch(0.610 0.0027 264.54)",
+          "oklch(0.730 0.0021 264.54)",
+          "oklch(0.850 0.0013 264.54)",
+          "oklch(0.950 0.0004 264.54)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Panel",
+        "tonalRamp": [
+          "oklch(0.150 0.0000 0.00)",
+          "oklch(0.250 0.0000 0.00)",
+          "oklch(0.370 0.0000 0.00)",
+          "oklch(0.490 0.0000 0.00)",
+          "oklch(0.610 0.0000 0.00)",
+          "oklch(0.730 0.0000 0.00)",
+          "oklch(0.850 0.0000 0.00)",
+          "oklch(0.950 0.0000 0.00)"
+        ]
+      },
+      "sidebar": {
+        "role": "neutral",
+        "displayName": "Workspace Rail",
+        "tonalRamp": [
+          "oklch(0.150 0.0006 286.38)",
+          "oklch(0.250 0.0009 286.38)",
+          "oklch(0.370 0.0012 286.38)",
+          "oklch(0.490 0.0013 286.38)",
+          "oklch(0.610 0.0012 286.38)",
+          "oklch(0.730 0.0010 286.38)",
+          "oklch(0.850 0.0006 286.38)",
+          "oklch(0.950 0.0002 286.38)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Primary Text",
+        "tonalRamp": [
+          "oklch(0.150 0.0128 270.32)",
+          "oklch(0.250 0.0199 270.32)",
+          "oklch(0.370 0.0258 270.32)",
+          "oklch(0.490 0.0281 270.32)",
+          "oklch(0.610 0.0264 270.32)",
+          "oklch(0.730 0.0211 270.32)",
+          "oklch(0.850 0.0128 270.32)",
+          "oklch(0.950 0.0044 270.32)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Text",
+        "tonalRamp": [
+          "oklch(0.150 0.0111 271.89)",
+          "oklch(0.250 0.0173 271.89)",
+          "oklch(0.370 0.0224 271.89)",
+          "oklch(0.490 0.0244 271.89)",
+          "oklch(0.610 0.0230 271.89)",
+          "oklch(0.730 0.0183 271.89)",
+          "oklch(0.850 0.0111 271.89)",
+          "oklch(0.950 0.0038 271.89)"
+        ]
+      },
+      "secondary": {
+        "role": "neutral",
+        "displayName": "Secondary Text",
+        "tonalRamp": [
+          "oklch(0.150 0.0126 267.72)",
+          "oklch(0.250 0.0196 267.72)",
+          "oklch(0.370 0.0254 267.72)",
+          "oklch(0.490 0.0277 267.72)",
+          "oklch(0.610 0.0260 267.72)",
+          "oklch(0.730 0.0208 267.72)",
+          "oklch(0.850 0.0126 267.72)",
+          "oklch(0.950 0.0043 267.72)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Divider",
+        "tonalRamp": [
+          "oklch(0.150 0.0026 264.53)",
+          "oklch(0.250 0.0041 264.53)",
+          "oklch(0.370 0.0053 264.53)",
+          "oklch(0.490 0.0058 264.53)",
+          "oklch(0.610 0.0054 264.53)",
+          "oklch(0.730 0.0043 264.53)",
+          "oklch(0.850 0.0026 264.53)",
+          "oklch(0.950 0.0009 264.53)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Border",
+        "tonalRamp": [
+          "oklch(0.150 0.0038 271.33)",
+          "oklch(0.250 0.0059 271.33)",
+          "oklch(0.370 0.0077 271.33)",
+          "oklch(0.490 0.0083 271.33)",
+          "oklch(0.610 0.0079 271.33)",
+          "oklch(0.730 0.0063 271.33)",
+          "oklch(0.850 0.0038 271.33)",
+          "oklch(0.950 0.0013 271.33)"
+        ]
+      },
+      "primary": {
+        "role": "primary",
+        "displayName": "Periwinkle Blue",
+        "tonalRamp": [
+          "oklch(0.150 0.0726 272.95)",
+          "oklch(0.250 0.1130 272.95)",
+          "oklch(0.370 0.1467 272.95)",
+          "oklch(0.490 0.1598 272.95)",
+          "oklch(0.610 0.1504 272.95)",
+          "oklch(0.730 0.1199 272.95)",
+          "oklch(0.850 0.0726 272.95)",
+          "oklch(0.950 0.0250 272.95)"
+        ]
+      },
+      "primary-soft": {
+        "role": "primary",
+        "displayName": "Soft Periwinkle",
+        "tonalRamp": [
+          "oklch(0.150 0.0080 275.64)",
+          "oklch(0.250 0.0125 275.64)",
+          "oklch(0.370 0.0163 275.64)",
+          "oklch(0.490 0.0177 275.64)",
+          "oklch(0.610 0.0167 275.64)",
+          "oklch(0.730 0.0133 275.64)",
+          "oklch(0.850 0.0080 275.64)",
+          "oklch(0.950 0.0028 275.64)"
+        ]
+      },
+      "teal": {
+        "role": "secondary",
+        "displayName": "Soft Teal",
+        "tonalRamp": [
+          "oklch(0.150 0.0468 185.42)",
+          "oklch(0.250 0.0729 185.42)",
+          "oklch(0.370 0.0946 185.42)",
+          "oklch(0.490 0.1030 185.42)",
+          "oklch(0.610 0.0970 185.42)",
+          "oklch(0.730 0.0773 185.42)",
+          "oklch(0.850 0.0468 185.42)",
+          "oklch(0.950 0.0161 185.42)"
+        ]
+      },
+      "teal-soft": {
+        "role": "secondary",
+        "displayName": "Soft Teal Surface",
+        "tonalRamp": [
+          "oklch(0.150 0.0071 177.09)",
+          "oklch(0.250 0.0111 177.09)",
+          "oklch(0.370 0.0144 177.09)",
+          "oklch(0.490 0.0156 177.09)",
+          "oklch(0.610 0.0147 177.09)",
+          "oklch(0.730 0.0117 177.09)",
+          "oklch(0.850 0.0071 177.09)",
+          "oklch(0.950 0.0024 177.09)"
+        ]
+      },
+      "green": {
+        "role": "tertiary",
+        "displayName": "Success",
+        "tonalRamp": [
+          "oklch(0.150 0.0531 165.95)",
+          "oklch(0.250 0.0828 165.95)",
+          "oklch(0.370 0.1074 165.95)",
+          "oklch(0.490 0.1170 165.95)",
+          "oklch(0.610 0.1101 165.95)",
+          "oklch(0.730 0.0878 165.95)",
+          "oklch(0.850 0.0531 165.95)",
+          "oklch(0.950 0.0183 165.95)"
+        ]
+      },
+      "red": {
+        "role": "tertiary",
+        "displayName": "Failure",
+        "tonalRamp": [
+          "oklch(0.150 0.0688 18.00)",
+          "oklch(0.250 0.1072 18.00)",
+          "oklch(0.370 0.1391 18.00)",
+          "oklch(0.490 0.1515 18.00)",
+          "oklch(0.610 0.1426 18.00)",
+          "oklch(0.730 0.1137 18.00)",
+          "oklch(0.850 0.0688 18.00)",
+          "oklch(0.950 0.0237 18.00)"
+        ]
+      },
+      "amber": {
+        "role": "tertiary",
+        "displayName": "Warning",
+        "tonalRamp": [
+          "oklch(0.150 0.0503 75.44)",
+          "oklch(0.250 0.0784 75.44)",
+          "oklch(0.370 0.1017 75.44)",
+          "oklch(0.490 0.1108 75.44)",
+          "oklch(0.610 0.1043 75.44)",
+          "oklch(0.730 0.0832 75.44)",
+          "oklch(0.850 0.0503 75.44)",
+          "oklch(0.950 0.0173 75.44)"
+        ]
+      },
+      "dark-bg": {
+        "role": "neutral",
+        "displayName": "Dark Canvas",
+        "tonalRamp": [
+          "oklch(0.150 0.0067 266.85)",
+          "oklch(0.250 0.0104 266.85)",
+          "oklch(0.370 0.0135 266.85)",
+          "oklch(0.490 0.0147 266.85)",
+          "oklch(0.610 0.0139 266.85)",
+          "oklch(0.730 0.0111 266.85)",
+          "oklch(0.850 0.0067 266.85)",
+          "oklch(0.950 0.0023 266.85)"
+        ]
+      },
+      "dark-surface": {
+        "role": "neutral",
+        "displayName": "Dark Panel",
+        "tonalRamp": [
+          "oklch(0.150 0.0083 266.22)",
+          "oklch(0.250 0.0129 266.22)",
+          "oklch(0.370 0.0167 266.22)",
+          "oklch(0.490 0.0182 266.22)",
+          "oklch(0.610 0.0172 266.22)",
+          "oklch(0.730 0.0137 266.22)",
+          "oklch(0.850 0.0083 266.22)",
+          "oklch(0.950 0.0029 266.22)"
+        ]
+      },
+      "dark-sidebar": {
+        "role": "neutral",
+        "displayName": "Dark Workspace Rail",
+        "tonalRamp": [
+          "oklch(0.150 0.0074 268.94)",
+          "oklch(0.250 0.0115 268.94)",
+          "oklch(0.370 0.0149 268.94)",
+          "oklch(0.490 0.0162 268.94)",
+          "oklch(0.610 0.0153 268.94)",
+          "oklch(0.730 0.0122 268.94)",
+          "oklch(0.850 0.0074 268.94)",
+          "oklch(0.950 0.0025 268.94)"
+        ]
+      },
+      "dark-text": {
+        "role": "neutral",
+        "displayName": "Dark Primary Text",
+        "tonalRamp": [
+          "oklch(0.150 0.0064 268.49)",
+          "oklch(0.250 0.0100 268.49)",
+          "oklch(0.370 0.0130 268.49)",
+          "oklch(0.490 0.0142 268.49)",
+          "oklch(0.610 0.0134 268.49)",
+          "oklch(0.730 0.0106 268.49)",
+          "oklch(0.850 0.0064 268.49)",
+          "oklch(0.950 0.0022 268.49)"
+        ]
+      },
+      "dark-muted": {
+        "role": "neutral",
+        "displayName": "Dark Muted Text",
+        "tonalRamp": [
+          "oklch(0.150 0.0129 266.48)",
+          "oklch(0.250 0.0201 266.48)",
+          "oklch(0.370 0.0261 266.48)",
+          "oklch(0.490 0.0285 266.48)",
+          "oklch(0.610 0.0268 266.48)",
+          "oklch(0.730 0.0214 266.48)",
+          "oklch(0.850 0.0129 266.48)",
+          "oklch(0.950 0.0045 266.48)"
+        ]
+      },
+      "dark-secondary": {
+        "role": "neutral",
+        "displayName": "Dark Secondary Text",
+        "tonalRamp": [
+          "oklch(0.150 0.0111 266.84)",
+          "oklch(0.250 0.0173 266.84)",
+          "oklch(0.370 0.0224 266.84)",
+          "oklch(0.490 0.0244 266.84)",
+          "oklch(0.610 0.0230 266.84)",
+          "oklch(0.730 0.0183 266.84)",
+          "oklch(0.850 0.0111 266.84)",
+          "oklch(0.950 0.0038 266.84)"
+        ]
+      },
+      "dark-line": {
+        "role": "neutral",
+        "displayName": "Dark Divider",
+        "tonalRamp": [
+          "oklch(0.150 0.0111 268.46)",
+          "oklch(0.250 0.0174 268.46)",
+          "oklch(0.370 0.0225 268.46)",
+          "oklch(0.490 0.0245 268.46)",
+          "oklch(0.610 0.0231 268.46)",
+          "oklch(0.730 0.0184 268.46)",
+          "oklch(0.850 0.0111 268.46)",
+          "oklch(0.950 0.0038 268.46)"
+        ]
+      },
+      "dark-border": {
+        "role": "neutral",
+        "displayName": "Dark Border",
+        "tonalRamp": [
+          "oklch(0.150 0.0120 266.74)",
+          "oklch(0.250 0.0187 266.74)",
+          "oklch(0.370 0.0243 266.74)",
+          "oklch(0.490 0.0265 266.74)",
+          "oklch(0.610 0.0249 266.74)",
+          "oklch(0.730 0.0199 266.74)",
+          "oklch(0.850 0.0120 266.74)",
+          "oklch(0.950 0.0041 266.74)"
+        ]
+      },
+      "dark-primary": {
+        "role": "primary",
+        "displayName": "Dark Periwinkle Blue",
+        "tonalRamp": [
+          "oklch(0.150 0.0574 275.02)",
+          "oklch(0.250 0.0895 275.02)",
+          "oklch(0.370 0.1161 275.02)",
+          "oklch(0.490 0.1265 275.02)",
+          "oklch(0.610 0.1190 275.02)",
+          "oklch(0.730 0.0949 275.02)",
+          "oklch(0.850 0.0574 275.02)",
+          "oklch(0.950 0.0198 275.02)"
+        ]
+      },
+      "dark-primary-soft": {
+        "role": "primary",
+        "displayName": "Dark Soft Periwinkle",
+        "tonalRamp": [
+          "oklch(0.150 0.0238 272.87)",
+          "oklch(0.250 0.0371 272.87)",
+          "oklch(0.370 0.0481 272.87)",
+          "oklch(0.490 0.0524 272.87)",
+          "oklch(0.610 0.0493 272.87)",
+          "oklch(0.730 0.0393 272.87)",
+          "oklch(0.850 0.0238 272.87)",
+          "oklch(0.950 0.0082 272.87)"
+        ]
+      },
+      "dark-teal": {
+        "role": "secondary",
+        "displayName": "Dark Soft Teal",
+        "tonalRamp": [
+          "oklch(0.150 0.0445 183.69)",
+          "oklch(0.250 0.0693 183.69)",
+          "oklch(0.370 0.0899 183.69)",
+          "oklch(0.490 0.0979 183.69)",
+          "oklch(0.610 0.0921 183.69)",
+          "oklch(0.730 0.0735 183.69)",
+          "oklch(0.850 0.0445 183.69)",
+          "oklch(0.950 0.0153 183.69)"
+        ]
+      },
+      "dark-teal-soft": {
+        "role": "secondary",
+        "displayName": "Dark Soft Teal Surface",
+        "tonalRamp": [
+          "oklch(0.150 0.0149 183.52)",
+          "oklch(0.250 0.0233 183.52)",
+          "oklch(0.370 0.0302 183.52)",
+          "oklch(0.490 0.0329 183.52)",
+          "oklch(0.610 0.0309 183.52)",
+          "oklch(0.730 0.0247 183.52)",
+          "oklch(0.850 0.0149 183.52)",
+          "oklch(0.950 0.0051 183.52)"
+        ]
+      },
+      "dark-green": {
+        "role": "tertiary",
+        "displayName": "Dark Success",
+        "tonalRamp": [
+          "oklch(0.150 0.0491 167.47)",
+          "oklch(0.250 0.0764 167.47)",
+          "oklch(0.370 0.0992 167.47)",
+          "oklch(0.490 0.1080 167.47)",
+          "oklch(0.610 0.1017 167.47)",
+          "oklch(0.730 0.0811 167.47)",
+          "oklch(0.850 0.0491 167.47)",
+          "oklch(0.950 0.0169 167.47)"
+        ]
+      },
+      "dark-red": {
+        "role": "tertiary",
+        "displayName": "Dark Failure",
+        "tonalRamp": [
+          "oklch(0.150 0.0489 15.56)",
+          "oklch(0.250 0.0761 15.56)",
+          "oklch(0.370 0.0988 15.56)",
+          "oklch(0.490 0.1076 15.56)",
+          "oklch(0.610 0.1013 15.56)",
+          "oklch(0.730 0.0808 15.56)",
+          "oklch(0.850 0.0489 15.56)",
+          "oklch(0.950 0.0168 15.56)"
+        ]
+      },
+      "dark-amber": {
+        "role": "tertiary",
+        "displayName": "Dark Warning",
+        "tonalRamp": [
+          "oklch(0.150 0.0426 83.53)",
+          "oklch(0.250 0.0664 83.53)",
+          "oklch(0.370 0.0861 83.53)",
+          "oklch(0.490 0.0938 83.53)",
+          "oklch(0.610 0.0883 83.53)",
+          "oklch(0.730 0.0704 83.53)",
+          "oklch(0.850 0.0426 83.53)",
+          "oklch(0.950 0.0147 83.53)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles"
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Panel headings"
+      },
+      "metric": {
+        "displayName": "Metric",
+        "purpose": "Tabular summary values"
+      },
+      "navigation": {
+        "displayName": "Navigation",
+        "purpose": "Workspace destinations"
+      },
+      "field": {
+        "displayName": "Field",
+        "purpose": "Settings fields"
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Action labels"
+      }
+    },
+    "shadows": [
+      {
+        "name": "panel-light",
+        "value": "0 2px 3px #202b4602",
+        "purpose": "Faint separation of light panels."
+      },
+      {
+        "name": "panel-dark",
+        "value": "0 2px 3px #00000008",
+        "purpose": "Faint separation of dark panels."
+      },
+      {
+        "name": "tooltip",
+        "value": "0 4px 18px #00000015",
+        "purpose": "Floating chart tooltip."
+      },
+      {
+        "name": "mobile-drawer",
+        "value": "10px 0 40px #00000008",
+        "purpose": "Overlaying mobile navigation."
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-transition",
+        "value": "150ms ease",
+        "purpose": "Color, background, and border state changes."
+      },
+      {
+        "name": "drawer-transition",
+        "value": "200ms ease",
+        "purpose": "Mobile drawer movement; disabled for reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1600px"
+      },
+      {
+        "name": "compact-desktop",
+        "value": "1190px"
+      },
+      {
+        "name": "tablet",
+        "value": "1000px"
+      },
+      {
+        "name": "mobile",
+        "value": "740px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary action in the current theme.",
+      "html": "<button class=\"ds-button-primary\">Connect</button>",
+      "css": ".ds-button-primary {font-family:inherit;font-size:10px;font-weight:550;min-height:34px;padding:9px 12px;border-radius:7px;cursor:pointer;transition:border-color .15s,background .15s;background:var(--primary);color:light-dark(var(--surface),#171d32);border:1px solid var(--primary)}.ds-button-primary:hover{filter:brightness(1.08)}.ds-button-primary:focus-visible{outline:2px solid var(--primary);outline-offset:3px;}.ds-button-primary:disabled{opacity:.48;cursor:default}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Bordered secondary action.",
+      "html": "<button class=\"ds-button-secondary\">Pause</button>",
+      "css": ".ds-button-secondary {font-family:inherit;font-size:10px;font-weight:550;min-height:34px;padding:9px 12px;border-radius:7px;cursor:pointer;transition:border-color .15s,background .15s;background:var(--surface);color:var(--text);border:1px solid var(--border)}.ds-button-secondary:hover{border-color:var(--primary);color:var(--primary)}.ds-button-secondary:focus-visible{outline:2px solid var(--primary);outline-offset:3px;}.ds-button-secondary:disabled{opacity:.48;cursor:default}"
+    },
+    {
+      "name": "Settings Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Labeled backend name field.",
+      "html": "<label class=\"ds-field-label\">Backend name<input class=\"ds-field\" placeholder=\"Local Shadowquic\"></label>",
+      "css": ".ds-field-label{display:block;font-family:inherit;font-size:11px;font-weight:500;color:var(--text)}.ds-field{display:block;margin-top:9px;min-height:38px;padding:11px 12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:7px;font-family:inherit;font-size:11px}.ds-field::placeholder{color:var(--muted)}.ds-field:focus-visible{outline:2px solid var(--primary);outline-offset:3px;}"
+    },
+    {
+      "name": "Workspace Navigation",
+      "kind": "nav",
+      "refersTo": "navigation-active",
+      "description": "Active and inactive navigation destinations.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Workspace\"><button class=\"ds-nav-item ds-nav-active\" aria-current=\"page\">Overview</button><button class=\"ds-nav-item\">Connections</button></nav>",
+      "css": ".ds-nav{display:flex;flex-direction:column;gap:6px}.ds-nav-item{display:flex;align-items:center;height:44px;padding:0 14px;background:transparent;border:0;border-radius:8px;color:var(--secondary);font-family:inherit;font-size:12px;text-align:left;cursor:pointer;transition:background .15s,color .15s}.ds-nav-item:hover{background:var(--line);color:var(--text)}.ds-nav-item.ds-nav-active{background:var(--primary-soft);color:var(--primary);font-weight:600}.ds-nav-item:focus-visible{outline:2px solid var(--primary);outline-offset:3px;}"
+    },
+    {
+      "name": "Connection Status",
+      "kind": "chip",
+      "refersTo": "status-chip",
+      "description": "Connection label with a status dot.",
+      "html": "<span class=\"ds-status\"><i class=\"ds-status-dot\" aria-hidden=\"true\"></i>Online</span>",
+      "css": ".ds-status{display:inline-flex;align-items:center;gap:5px;padding:5px 7px;border-radius:5px;font-family:inherit;font-size:8px;font-weight:500;color:var(--green);background:color-mix(in srgb,var(--green) 9%,var(--surface))}.ds-status-dot{width:5px;height:5px;border-radius:50%;background:var(--green)}"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Shared bordered content container.",
+      "html": "<section class=\"ds-panel\"><h2 class=\"ds-panel-title\">Traffic activity</h2><p class=\"ds-panel-caption\">Bandwidth over the last two minutes</p></section>",
+      "css": ".ds-panel{padding:20px 21px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow)}.ds-panel-title{margin:0;font-family:inherit;font-size:14px;font-weight:650;letter-spacing:-.15px}.ds-panel-caption{margin:5px 0 0;color:var(--muted);font-family:inherit;font-size:10px;line-height:1.6}"
+    },
+    {
+      "name": "Metric Card",
+      "kind": "card",
+      "refersTo": "metric-card",
+      "description": "Headline metric with supporting total.",
+      "html": "<section class=\"ds-metric\"><div class=\"ds-metric-label\">Download speed</div><div class=\"ds-metric-value\">4.2 <small>MB/s</small></div><div class=\"ds-metric-caption\">Example value</div></section>",
+      "css": ".ds-metric{padding:18px 19px;min-height:137px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);font-family:inherit}.ds-metric-label{font-size:10px;font-weight:500;color:var(--secondary)}.ds-metric-value{margin-top:7px;font-size:27px;font-weight:600;letter-spacing:-1px;line-height:1.25;font-variant-numeric:tabular-nums}.ds-metric-value small{font-size:12px;font-weight:450;color:var(--muted);letter-spacing:0}.ds-metric-caption{margin-top:13px;font-size:8.5px;color:var(--muted)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Network Console",
+    "overview": "The Quiet Network Console is calm, compact, and approachable. The interface pairs a persistent workspace rail with compact numeric summaries, charts, and bordered panels, keeping operational information easy to scan.\n\nControls are soft, friendly, and gently tactile. Layered surfaces, with shadows separating levels, give the console depth without heavy visual weight. The current panel shadows are intentionally very faint; borders and changes in background tone do most of the separation.",
+    "keyCharacteristics": [
+      "Compact operational hierarchy with tabular numeric metrics.",
+      "Periwinkle Blue for primary actions and download activity; Soft Teal for upload activity.",
+      "Softly rounded controls and panels with restrained depth.",
+      "Paired light and dark themes, plus responsive desktop and mobile navigation."
+    ],
+    "rules": [
+      {
+        "name": "The Traffic Pair Rule",
+        "body": "Keep download on the primary accent and upload on the teal accent, with accompanying series labels.",
+        "section": "colors"
+      },
+      {
+        "name": "The Quiet Depth Rule",
+        "body": "Preserve subtle panel separation; reserve stronger depth for overlapping surfaces.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use the existing semantic CSS variables so both themes stay coherent.",
+      "Do preserve the Periwinkle Blue download and Soft Teal upload distinction across charts and legends.",
+      "Do carry rounded controls, bordered panels, and subtle depth into related screens.",
+      "Do preserve visible keyboard focus and the existing reduced-motion behavior."
+    ],
+    "donts": [
+      "Don't replace the incumbent type stack or accent roles during a refinement.",
+      "Don't turn the faint panel shadow into a heavy floating-card treatment.",
+      "Don't remove text labels that distinguish data series or connection states."
+    ]
+  }
+}
