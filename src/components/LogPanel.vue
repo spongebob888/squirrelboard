@@ -20,7 +20,7 @@ let alive = true
 onBeforeUnmount(() => { alive = false })
 const end = computed(() => frozen.value ?? props.now)
 const options = (): LogQuery => ({ end: end.value, windowMs: windowMs.value, requestId: props.requestId.trim(), selectedId: selectedId.value, page: requestPage.value, limit: 100, offset: eventOffset.value })
-const controls = () => JSON.stringify([props.storageEpoch, windowMs.value, props.requestId, selectedId.value, requestPage.value, eventOffset.value, frozen.value])
+const controls = () => JSON.stringify([props.storageEpoch, windowMs.value, props.requestId, selectedId.value === undefined ? ['auto'] : ['explicit', selectedId.value], requestPage.value, eventOffset.value, frozen.value])
 async function load() {
   dirty = true
   if (running) return
@@ -111,6 +111,7 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
         </ol>
         <div v-if="selected.count > 100" class="log-pagination"><button class="button small" :disabled="eventOffset === 0" @click="eventOffset = Math.max(0, eventOffset - 100)">Previous events</button><span>{{ eventOffset + 1 }}–{{ Math.min(eventOffset + 100, selected.count) }} of {{ selected.count }}</span><button class="button small" :disabled="eventOffset + 100 >= selected.count" @click="eventOffset += 100">Next events</button></div>
       </div>
+      <div v-else-if="selectedId !== undefined" class="empty-state log-timeline"><h3>{{ selectedId === null ? 'Unscoped events are no longer in this window' : `Request ${selectedId} is no longer in this window` }}</h3><p>Choose a wider time window or another request. Older events may have expired or been removed at the storage limit.</p><button class="button" @click="selectedId = undefined; eventOffset = 0">Show newest request</button></div>
     </div>
     <div v-else class="empty-state"><h3>{{ loading ? 'Loading captured events' : requestId ? `No captured events for request ${requestId}` : 'Waiting for request events' }}</h3><p>{{ requestId ? 'Try a wider time window or clear the request filter. Events from before capture began are unavailable.' : 'New events appear here when the backend emits them. Capture continues as you browse other panels.' }}</p></div>
   </section>
@@ -139,7 +140,7 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
 .log-warning { margin: 0 21px 16px; padding: 12px; background: var(--bg); color: var(--text); font-size: 12px; border: 1px solid var(--border); border-radius: 7px; }
 .log-frozen { color: var(--secondary); font-size: 12px; }
 .log-workspace { display: grid; grid-template-columns: 260px minmax(0, 1fr); border-top: 1px solid var(--border); }
-.log-requests { min-width: 0; border-right: 1px solid var(--border); }
+.log-requests { min-width: 0; max-height: 70vh; overflow-y: auto; overflow-anchor: none; overscroll-behavior-y: contain; align-self: start; border-right: 1px solid var(--border); }
 .log-list-heading { display: flex; justify-content: space-between; gap: 10px; padding: 16px; font-size: 12px; color: var(--secondary); }
 .log-request { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 12px; }
 .log-request:hover { background: var(--bg); }

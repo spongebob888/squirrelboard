@@ -157,6 +157,8 @@ export function summarizeLogs(rows: Overview[], query: LogQuery): LogView {
   const all = [...groups.values()].sort((a, b) => b.last.receivedAt - a.last.receivedAt)
   const pages = Math.max(1, Math.ceil(all.length / 30))
   const page = Math.min(pages, Math.max(1, query.page))
-  const selected = all.find(group => group.id === query.selectedId) ?? (query.requestId ? all.find(group => group.id === query.requestId) : all[0]) ?? null
+  const selected = (query.selectedId !== undefined
+    ? all.find(group => group.id === query.selectedId)
+    : query.requestId ? all.find(group => group.id === query.requestId) : all[0]) ?? null
   return { requests: all.slice((page - 1) * 30, page * 30), totalRequests: all.length, totalEvents, pages, page, selected, events: [] }
 }
