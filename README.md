@@ -86,6 +86,16 @@ The Traffic page collects one first-response measurement per observed session, i
 
 Outbounds with fewer than 50 samples in the selected window use coarse latency buckets. With 50 or more, bin widths adapt to the sample count and observed range: more data supports narrower intervals, with readable 1/2/5-based widths and a minimum of 1 ms. The grid covers the minimum through P95 with up to 65 finite bins; an overflow bin retains higher latencies without letting outliers widen the main grid. Each chart displays its bin width, and hover tooltips show the interval, sample count, and percentage for every bar.
 
+## Request log timelines
+
+The **Log** panel subscribes to the `sq_log` branch's `/api/v1/logs` WebSocket as soon as the dashboard opens. Select a connection, then **View request log** to correlate its session ID with `req_id`. IDs are read from event fields or the innermost enclosing request span. Request headers use the active connection when available and fall back to captured destination, protocol, inbound, and outbound fields, so short-lived TCP requests remain identifiable after they close. Events without a request ID appear separately as unscoped events.
+
+Choose a rolling 1, 5, 15, or 30 minute arrival-time window and optionally enter an exact request ID. Each request has an event overview and a detailed timeline with server timestamps, elapsed offsets, levels, and expandable fields/spans. Event fields appear immediately after the log message as `key=value`, preserving tracing-rendered values; the message itself is not repeated as a field. **Freeze view** preserves a snapshot for inspection while capture continues. Observed spans measure captured events, not total request duration. Links such as `#log?req_id=42` open a request filter; they do not retrieve history.
+
+Capture stays in this tab's memory for up to 30 minutes or 10,000 events, and resets on backend changes or reload. Dashboard pause and hidden tabs close the stream. Reconnects use backoff; interruptions, backend lag notices, invalid records, and buffer evictions are reported. The API cannot replay missed events. Older backends without the endpoint leave Log unavailable without blocking the other panels. Demo events are simulated and open no log socket.
+
+Browser WebSockets use the backend's supported `?token=` authentication because they cannot set a Bearer header. The token remains in session storage, but is sent in the WebSocket handshake URL; configure upstream access logging accordingly. Use HTTPS/WSS for remote deployments. Both the Vite proxy and the supplied Nginx configuration forward WebSocket upgrades; the Nginx API location disables access logging to avoid recording tokens.
+
 ## Build and serve
 
 ```sh

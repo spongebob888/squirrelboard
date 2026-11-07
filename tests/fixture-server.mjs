@@ -63,3 +63,22 @@ const server = http.createServer(async (req, res) => {
 })
 server.listen(19090, '127.0.0.1')
 process.on('SIGTERM', () => server.close())
+
+// Minimal server-side frames exercise Vite's actual WebSocket upgrade proxy.
+const { createHash } = await import('node:crypto')
+server.on('upgrade', (req, socket) => {
+  const url = new URL(req.url, 'http://localhost')
+  const authorized = url.searchParams.get('token') === 'fixture-secret'
+  requests.push({ method: 'GET', url: url.pathname, authorized })
+  if (!authorized || url.pathname !== '/api/v1/logs') { socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n'); return }
+  const accept = createHash('sha1').update(req.headers['sec-websocket-key'] + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64')
+  socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`)
+  socket.on('error', () => {})
+  socket.on('data', data => { if ((data[0] & 0x0f) === 8) socket.end(Buffer.from([0x88, 0])) })
+  const base = Date.now()
+  for (const [index, event] of ['mixed:accepted', 'router:matched', 'stream:first_response'].entries()) {
+    const payload = Buffer.from(JSON.stringify({ timestamp: new Date(base + index * 25).toISOString(), level: 'TRACE', target: 'shadowquic::fixture', event, fields: { message: 'Fixture event' }, spans: [{ name: 'request', fields: { req_id: 1 } }] }))
+    const header = Buffer.alloc(4); header[0] = 0x81; header[1] = 126; header.writeUInt16BE(payload.length, 2)
+    socket.write(Buffer.concat([header, payload]))
+  }
+})
