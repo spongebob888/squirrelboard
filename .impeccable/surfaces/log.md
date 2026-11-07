@@ -27,3 +27,7 @@ Use compact event rows with 8px vertical padding and subtle separators. Group ti
 ## Event category colors
 
 Use stable colors for Connection (blue), Routing (primary), DNS (teal), Sniffing (purple), Security (amber), Transport (green), and Other (secondary). Apply category color to event names, timeline dots, offset bars, and request preview dots. Show a compact legend for categories in the selected request. WARN/ERROR text retains severity colors independently. Event prefixes and legend labels provide non-color identification. Category text mixes 60% category color with the theme text token for contrast; blue and purple have local light/dark values.
+
+## IndexedDB storage
+
+Retain captured events by backend address in IndexedDB for 30 minutes, with a browser-wide maximum set in Settings → Log storage (default 100,000). A worker handles batched writes, eviction, and summary queries; render 30 request summaries and 100 event bodies per page. Freeze fixes the time window while retention continues. Show storage failure status and use a bounded memory fallback. Demo remains memory-only. Preserve the existing visual tokens and compact timeline layout.

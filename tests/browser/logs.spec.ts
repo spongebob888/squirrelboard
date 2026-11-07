@@ -67,6 +67,7 @@ test('demo logs do not open a socket', async ({ page }) => {
   await expect(page.locator('.log-heading')).toContainText('Demo')
   await expect(page.locator('.log-events li')).toHaveCount(4)
   expect(sockets).toBe(0)
+  expect(await page.evaluate(async () => (await indexedDB.databases()).some(db => db.name === 'squirrelboard.logs'))).toBe(false)
 })
 
 test('stream failures keep captured events visible and retry without blocking the dashboard', async ({ page }) => {

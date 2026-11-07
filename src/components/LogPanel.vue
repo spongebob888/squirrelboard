@@ -1,87 +1,102 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { LOG_CATEGORIES, logCategory, logFields, logsInWindow, requestMetadata, type LogEvent } from '../lib/logs'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import { LOG_CATEGORIES, logCategory, logFields, requestMetadata, type LogEvent, type RequestMetadata } from '../lib/logs'
+import { emptyLogView, type LogQuery, type LogView, type RequestSummary } from '../lib/log-storage'
 import type { Connection } from '../lib/types'
 
-const props = defineProps<{ events: LogEvent[]; now: number; state: string; dropped: number; invalid: number; evicted: number; gaps: number; requestId: string; connections: Connection[] }>()
+const props = defineProps<{ revision: number; storageEpoch: number; storedCount: number; maxEvents: number; storageError: string; query: (options: LogQuery) => Promise<LogView>; now: number; state: string; dropped: number; invalid: number; evicted: number; gaps: number; requestId: string; connections: Connection[] }>()
 const emit = defineEmits<{ request: [id: string]; retry: [] }>()
 const windowMs = ref(300_000)
-const frozen = ref<{ end: number; events: LogEvent[] } | null>(null)
-const selectedId = ref<string | null>(props.requestId || null)
+const frozen = ref<number | null>(null)
+const selectedId = ref<string | null | undefined>(props.requestId || undefined)
 const requestPage = ref(1)
-const eventLimit = ref(100)
-watch(() => props.requestId, id => { selectedId.value = id || null; requestPage.value = 1; eventLimit.value = 100 })
-watch(windowMs, () => requestPage.value = 1)
-watch(() => props.events, events => { if (!events.length && props.state === 'Connecting') frozen.value = null })
-const end = computed(() => frozen.value?.end ?? props.now)
-const filtered = computed(() => logsInWindow(frozen.value?.events ?? props.events, end.value, windowMs.value, props.requestId.trim()))
-const requests = computed(() => {
-  const groups = new Map<string | null, LogEvent[]>()
-  for (const event of filtered.value) {
-    const group = groups.get(event.requestId) ?? []
-    group.push(event)
-    groups.set(event.requestId, group)
-  }
-  return [...groups].map(([id, events]) => ({ id, events, first: events[0]!, last: events.at(-1)! })).sort((a, b) => b.last.receivedAt - a.last.receivedAt)
-})
-const pages = computed(() => Math.max(1, Math.ceil(requests.value.length / 30)))
-watch(pages, count => requestPage.value = Math.min(requestPage.value, count))
-const retainedByRequest = computed(() => {
-  const groups = new Map<string, LogEvent[]>()
-  for (const event of frozen.value?.events ?? props.events) {
-    if (event.requestId === null) continue
-    const group = groups.get(event.requestId) ?? []
-    group.push(event)
-    groups.set(event.requestId, group)
-  }
-  return groups
-})
-const connectionsById = computed(() => new Map(props.connections.map(connection => [String(connection.id), connection])))
-function metadataFor(id: string | null) {
-  return requestMetadata(id === null ? [] : retainedByRequest.value.get(id) ?? [], id, id === null ? undefined : connectionsById.value.get(id))
+const eventOffset = ref(0)
+const view = shallowRef(emptyLogView())
+const loading = ref(true)
+const queryError = ref('')
+let running = false
+let dirty = false
+let alive = true
+onBeforeUnmount(() => { alive = false })
+const end = computed(() => frozen.value ?? props.now)
+const options = (): LogQuery => ({ end: end.value, windowMs: windowMs.value, requestId: props.requestId.trim(), selectedId: selectedId.value, page: requestPage.value, limit: 100, offset: eventOffset.value })
+const controls = () => JSON.stringify([props.storageEpoch, windowMs.value, props.requestId, selectedId.value, requestPage.value, eventOffset.value, frozen.value])
+async function load() {
+  dirty = true
+  if (running) return
+  running = true
+  try {
+    while (dirty && alive) {
+      dirty = false
+      const key = controls()
+      try {
+        const result = await props.query(options())
+        if (alive && key === controls()) {
+          view.value = result
+          requestPage.value = result.page
+          if (eventOffset.value >= (result.selected?.count ?? 0) && eventOffset.value > 0) eventOffset.value = 0
+          queryError.value = ''
+        }
+      } catch {
+        if (alive && key === controls()) queryError.value = 'Could not read stored logs. Capture will retry using the available storage.'
+      } finally { if (alive) loading.value = false }
+    }
+  } finally { running = false }
 }
-const visible = computed(() => requests.value.slice((requestPage.value - 1) * 30, requestPage.value * 30).map(request => ({ ...request, destination: metadataFor(request.id).destination })))
-const selected = computed(() => requests.value.find(request => request.id === selectedId.value) ?? (props.requestId ? undefined : requests.value[0]))
-const metadata = computed(() => metadataFor(selected.value?.id ?? null))
-const categories = computed(() => [...new Set(selected.value?.events.map(event => logCategory(event.event)) ?? [])])
+watch(() => props.requestId, id => { selectedId.value = id || undefined; requestPage.value = 1; eventOffset.value = 0 })
+watch(windowMs, () => { requestPage.value = 1; eventOffset.value = 0 })
+watch(() => props.storageEpoch, () => { frozen.value = null; view.value = emptyLogView(); loading.value = true })
+watch(controls, () => { void load() }, { immediate: true })
+watch(() => props.revision, () => { if (frozen.value === null) void load() })
+const selected = computed(() => view.value.selected)
+const pages = computed(() => view.value.pages)
+const connectionsById = computed(() => new Map(props.connections.map(connection => [String(connection.id), connection])))
+function metadataFor(request: RequestSummary): RequestMetadata {
+  const live = requestMetadata([], request.id, request.id === null ? undefined : connectionsById.value.get(request.id))
+  return Object.fromEntries(Object.entries(request.metadata).map(([key, value]) => [key, live[key as keyof RequestMetadata] ?? value])) as unknown as RequestMetadata
+}
+const visible = computed(() => view.value.requests.map(request => ({ ...request, destination: metadataFor(request).destination })))
+const metadata = computed(() => selected.value ? metadataFor(selected.value) : { destination: null, protocol: null, inbound: null, outbound: null })
+const categories = computed(() => selected.value?.categories ?? [])
 const hasMetadata = computed(() => Object.values(metadata.value).some(Boolean))
 const elapsed = (ms: number) => ms < 1000 ? `${Math.max(0, ms).toFixed(0)} ms` : `${(ms / 1000).toFixed(2)} s`
 const time = (at: number) => new Date(at).toLocaleTimeString([], { hour12: false }) + `.${String(new Date(at).getMilliseconds()).padStart(3, '0')}`
 const label = (event: LogEvent) => event.event || 'Unlabelled event'
-const visibleEvents = computed(() => selected.value?.events.slice(0, eventLimit.value).map(event => ({ ...event, inlineFields: logFields(event.fields) })) ?? [])
-function select(id: string | null) { selectedId.value = id; eventLimit.value = 100 }
-function freeze() { frozen.value = frozen.value ? null : { end: props.now, events: [...props.events] } }
+const visibleEvents = computed(() => view.value.events.map(event => ({ ...event, inlineFields: logFields(event.fields) })))
+function select(id: string | null) { selectedId.value = id; eventOffset.value = 0 }
+function freeze() { frozen.value = frozen.value === null ? props.now : null }
 </script>
 
 <template>
   <section class="panel log-panel" aria-label="Request logs">
     <div class="panel-heading log-heading">
-      <div><h2>Request timelines</h2><p><span class="status-dot" :class="{ online: state === 'Live' }"/>{{ state }} · {{ filtered.length.toLocaleString() }} events in window</p></div>
+      <div><h2>Request timelines</h2><p><span class="status-dot" :class="{ online: state === 'Live' }"/>{{ state }} · {{ view.totalEvents.toLocaleString() }} events in window</p></div>
       <div class="log-actions"><button class="button" :aria-pressed="!!frozen" @click="freeze">{{ frozen ? 'Follow live' : 'Freeze view' }}</button><button v-if="state.includes('Unavailable')" class="button" @click="emit('retry')">Retry stream</button></div>
     </div>
     <div class="log-filters">
       <label>Request ID<input :value="requestId" placeholder="All requests" @input="emit('request', ($event.target as HTMLInputElement).value)"/></label>
       <label>Time window<select v-model="windowMs"><option :value="60_000">Last minute</option><option :value="300_000">Last 5 minutes</option><option :value="900_000">Last 15 minutes</option><option :value="1_800_000">Last 30 minutes</option></select></label>
       <button v-if="requestId" class="text-button" @click="emit('request', '')">Clear filter</button>
-      <span v-if="frozen" class="log-frozen">View frozen at {{ time(end) }}. Capture continues.</span>
+      <span v-if="frozen" class="log-frozen">View frozen at {{ time(end) }}. Capture and retention continue.</span>
     </div>
-    <p class="log-note">Live capture in this tab only · retained for 30 minutes, up to 10,000 events. Windows use arrival time; timelines use server timestamps. Session ID in Connections matches req_id.</p>
+    <p class="log-note">Browser log storage · retained for 30 minutes, up to {{ maxEvents.toLocaleString() }} events across backends. {{ storedCount.toLocaleString() }} stored for this backend. Change the limit in Settings. Windows use arrival time; timelines use server timestamps. Session ID in Connections matches req_id.</p>
+    <p v-if="storageError || queryError" class="log-warning" role="status">{{ storageError || queryError }}</p>
     <p v-if="state.includes('Unavailable')" class="log-warning" role="status">Cannot open the log stream. Check the API secret, backend support for /api/v1/logs, and WebSocket proxy settings. Retained events remain available.</p>
     <p v-if="state === 'Paused'" class="log-warning">Capture is paused while dashboard updates are paused or this tab is hidden. Events during this time cannot be replayed.</p>
     <p v-if="dropped || gaps || evicted || invalid" class="log-warning">Capture may be incomplete: {{ dropped }} server-dropped events, {{ gaps }} stream interruptions, {{ evicted }} events removed at the buffer limit, {{ invalid }} unreadable records.</p>
-    <div v-if="requests.length" class="log-workspace">
+    <div v-if="view.totalRequests" class="log-workspace">
       <aside class="log-requests" aria-label="Captured requests">
-        <div class="log-list-heading">{{ requests.length }} {{ requests.length === 1 ? 'request' : 'requests' }} <span>Observed span</span></div>
+        <div class="log-list-heading">{{ view.totalRequests }} {{ view.totalRequests === 1 ? 'request' : 'requests' }} <span>Observed span</span></div>
         <button v-for="request in visible" :key="request.id ?? 'unscoped'" class="log-request" :class="{ selected: selected?.id === request.id }" :aria-pressed="selected?.id === request.id" @click="select(request.id)">
-          <span><strong>{{ request.id === null ? 'Unscoped events' : `Request ${request.id}` }}</strong><small>{{ request.events.length }} events · {{ time(request.first.at) }}</small></span>
+          <span><strong>{{ request.id === null ? 'Unscoped events' : `Request ${request.id}` }}</strong><small>{{ request.count }} events · {{ time(request.first.at) }}</small></span>
           <span>{{ elapsed(request.last.at - request.first.at) }}</span>
           <span v-if="request.destination" class="log-request-destination" :title="request.destination">{{ request.destination }}</span>
-          <svg viewBox="0 0 240 14" preserveAspectRatio="none" aria-hidden="true"><line x1="4" y1="7" x2="236" y2="7"/><circle v-for="event in request.events.slice(-100)" :key="event.sequence" :cx="4 + (event.at - request.first.at) / Math.max(1, request.last.at - request.first.at) * 232" cy="7" r="3" :class="`category-${logCategory(event.event)}`"/></svg>
+          <svg viewBox="0 0 240 14" preserveAspectRatio="none" aria-hidden="true"><line x1="4" y1="7" x2="236" y2="7"/><circle v-for="event in request.markers" :key="event.sequence" :cx="4 + (event.at - request.first.at) / Math.max(1, request.last.at - request.first.at) * 232" cy="7" r="3" :class="`category-${logCategory(event.event)}`"/></svg>
         </button>
         <div v-if="pages > 1" class="log-pagination"><button class="button small" :disabled="requestPage === 1" @click="requestPage--">Previous</button><span>{{ requestPage }} / {{ pages }}</span><button class="button small" :disabled="requestPage === pages" @click="requestPage++">Next</button></div>
       </aside>
       <div v-if="selected" class="log-timeline">
-        <div class="log-timeline-heading"><h3>{{ selected.id === null ? 'Unscoped events' : `Request ${selected.id}` }}</h3><span>{{ elapsed(selected.last.at - selected.first.at) }} observed · {{ selected.events.length }} events</span></div>
+        <div class="log-timeline-heading"><h3>{{ selected.id === null ? 'Unscoped events' : `Request ${selected.id}` }}</h3><span>{{ elapsed(selected.last.at - selected.first.at) }} observed · {{ selected.count }} events</span></div>
         <p v-if="hasMetadata" class="log-destination">{{ metadata.destination || 'Unknown destination' }}<template v-if="metadata.protocol"> · {{ metadata.protocol }}</template><template v-if="metadata.inbound"> · Inbound: {{ metadata.inbound }}</template><template v-if="metadata.outbound"> · Outbound: {{ metadata.outbound }}</template></p>
         <p class="log-note timeline-note">{{ selected.id === null ? 'These events have no req_id and cannot be assigned to a request.' : 'Offsets start at the first captured event in this window; they may not cover the full request.' }}</p>
         <ul class="log-legend" aria-label="Event categories"><li v-for="category in categories" :key="category" :class="`category-${category}`"><i aria-hidden="true"/>{{ LOG_CATEGORIES[category] }}</li></ul>
@@ -94,10 +109,10 @@ function freeze() { frozen.value = frozen.value ? null : { end: props.now, event
             </div>
           </li>
         </ol>
-        <button v-if="selected.events.length > eventLimit" class="button" @click="eventLimit += 100">Show more events ({{ selected.events.length - eventLimit }} remaining)</button>
+        <div v-if="selected.count > 100" class="log-pagination"><button class="button small" :disabled="eventOffset === 0" @click="eventOffset = Math.max(0, eventOffset - 100)">Previous events</button><span>{{ eventOffset + 1 }}–{{ Math.min(eventOffset + 100, selected.count) }} of {{ selected.count }}</span><button class="button small" :disabled="eventOffset + 100 >= selected.count" @click="eventOffset += 100">Next events</button></div>
       </div>
     </div>
-    <div v-else class="empty-state"><h3>{{ requestId ? `No captured events for request ${requestId}` : 'Waiting for request events' }}</h3><p>{{ requestId ? 'Try a wider time window or clear the request filter. Events from before capture began are unavailable.' : 'New events appear here when the backend emits them. Capture continues as you browse other panels.' }}</p></div>
+    <div v-else class="empty-state"><h3>{{ loading ? 'Loading captured events' : requestId ? `No captured events for request ${requestId}` : 'Waiting for request events' }}</h3><p>{{ requestId ? 'Try a wider time window or clear the request filter. Events from before capture began are unavailable.' : 'New events appear here when the backend emits them. Capture continues as you browse other panels.' }}</p></div>
   </section>
 </template>
 

@@ -49,6 +49,17 @@ window.addEventListener('keydown', shortcut)
 onBeforeUnmount(() => window.removeEventListener('keydown', shortcut))
 const { backend, demo, data, history, latencySamples, latencyAsOf, status, error, lastUpdated, paused, loading, probing, selecting, notice, aggregate, speed, refresh, connect, reset, probe, select, toast, togglePause } = useDashboard()
 const logs = reactive(useLogs(backend, demo, paused, data))
+const logLimitInput = ref(logs.maxEvents)
+watch(() => logs.maxEvents, value => logLimitInput.value = value)
+const logLimitError = ref('')
+const logLimitBusy = ref(false)
+async function saveLogLimit() {
+  logLimitBusy.value = true
+  logLimitError.value = ''
+  try { await logs.setMaxEvents(Number(logLimitInput.value)); toast('Log event limit saved.') }
+  catch (error) { logLimitError.value = error instanceof Error ? error.message : 'Could not save the log event limit.' }
+  finally { logLimitBusy.value = false }
+}
 const search = ref('')
 const protocol = ref('all')
 const outboundFilter = ref('all')
@@ -221,6 +232,7 @@ function exportConnections() {
           <div class="settings-side"><section class="panel setup-help"><span class="section-icon"><ShieldCheck :size="20"/></span><h2>A home for your network</h2><p>Enable the REST API in your Shadowquic configuration:</p><pre>restful-api:
   bind-addr: "127.0.0.1:9090"
   secret: "your-secret"</pre><p>Vite dev and preview proxy requests to <code>127.0.0.1:9090</code> by default. For the router, start Vite with <code>SHADOWQUIC_API_URL=http://192.168.7.1:9090</code>. Leave API address empty in both cases.</p><div class="help-note"><CircleHelp :size="16"/><span>For production, serve the dashboard and /api/v1 through the same reverse proxy. An Nginx example is included in this project.</span></div></section><section class="panel appearance-panel"><div><h2>Appearance</h2><p>A little lighter, or a little darker.</p></div><button class="theme-toggle" :aria-label="dark ? 'Use light theme' : 'Use dark theme'" :aria-pressed="dark" @click="dark = !dark"><Sun :size="16"/><Moon :size="16"/><span :class="{ dark }"/></button></section></div></div>
+          <section class="panel log-settings"><div class="panel-heading"><div><h2>Log storage</h2><p>Keep captured events in this browser across reloads</p></div></div><form class="settings-form" @submit.prevent="saveLogLimit"><label>Maximum stored events<div class="inline-form"><input v-model.number="logLimitInput" type="number" min="1000" max="1000000" step="1" required/><button class="button" type="submit" :disabled="logLimitBusy">{{ logLimitBusy ? 'Saving…' : 'Save limit' }}</button></div><small>1,000–1,000,000 events across all backends. Default: 100,000. Events expire after 30 minutes; lowering the limit removes the oldest events. Storage stays on this device.</small></label><p v-if="logLimitError" class="form-message error" role="alert">{{ logLimitError }}</p><p v-if="logs.storageError" class="form-message error" role="status">{{ logs.storageError }}</p></form></section>
           <section class="panel probe-settings"><div class="panel-heading"><div><h2>Latency probes</h2><p>Test a route by requesting HTTP response headers through an outbound</p></div><Zap :size="19" class="muted"/></div><form class="settings-form" @submit.prevent="saveProbe()"><label>Probe URL<div class="inline-form"><input v-model="probeUrl" type="url" required placeholder="http://example.com/"/><button class="button" type="submit">Save URL</button></div><small>Use an http:// address that returns a 2xx response. Shadowquic does not follow redirects or support HTTPS probes. Timeout: 10 seconds.</small></label><p v-if="probeError" class="form-message error" role="alert">{{ probeError }}</p></form></section>
         </template>
 

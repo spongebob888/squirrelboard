@@ -23,7 +23,7 @@ A dashboard built for Shadowquic's native `/api/v1` REST API. Its controls and e
 - The existing app uses Vue and TypeScript with Vite and pnpm. Run `corepack pnpm dev`; the usual local URL is `http://127.0.0.1:5173`.
 - Users connect through Settings using an API address and optional secret. An empty API address uses the same-origin `/api/v1` proxy; `SHADOWQUIC_API_URL` selects the proxy's upstream.
 - Explicit API addresses connect directly from the browser and require appropriate CORS support and browser permission for the connection. Shadowquic itself does not provide CORS headers or preflight handling.
-- Hash routes expose Overview, Outbounds, Connections, Traffic, and Settings. Connection settings can also be supplied through URL fragment parameters, which are removed after reading.
+- Hash routes expose Overview, Outbounds, Connections, Traffic, Log, and Settings. Connection settings can also be supplied through URL fragment parameters, which are removed after reading.
 - The clearly labeled demo workspace uses simulated data and sends no API requests. It is available through Explore demo or `#overview?demo=1`.
 - Supported distribution formats include the normal static build and a self-contained HTML build. A separately hosted static build needs an API proxy or a browser-accessible API address.
 
@@ -60,3 +60,8 @@ A dashboard built for Shadowquic's native `/api/v1` REST API. Its controls and e
 ## Open Decisions
 
 No additional requirements were identified in this initialization. Specific accessibility conformance targets and any future brand commitments remain unestablished; do not present them as confirmed requirements.
+
+## Log capture storage
+
+- Capture structured WebSocket events in IndexedDB, scoped by normalized backend address, with a 30-minute retention window and a browser-local event limit of 1,000–1,000,000 (default 100,000) shared across stored backends. Reloading restores retained events; credentials are not persisted in log records.
+- Batch writes and request grouping in a worker. Keep the rendered request list and event bodies paginated. Report storage failures and bound the memory-only fallback to 10,000 events or the configured limit, whichever is lower. Demo capture remains memory-only.
