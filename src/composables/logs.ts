@@ -138,7 +138,8 @@ export function useLogs(backend: Ref<Backend>, demo: Ref<boolean>, paused: Ref<b
     const view = summarizeLogs(overview, options)
     if (options.mode === 'waterfall') {
       view.waterfall = summarizeWaterfall(overview, options)
-      view.events = rows.filter(event => event.sequence === options.eventSequence && event.receivedAt >= options.end - options.windowMs && (!options.requestId || event.requestId === options.requestId) && logLevelMatches(event.level, options.level))
+      const bySequence = new Map(rows.map(event => [event.sequence, event]))
+      view.events = view.waterfall.points.map(point => bySequence.get(point.sequence)!).filter(Boolean)
     } else if (view.selected) view.events = rows.filter(event => event.requestId === view.selected!.id && event.receivedAt >= options.end - options.windowMs && logLevelMatches(event.level, options.level))
       .sort((a, b) => a.at - b.at || a.sequence - b.sequence).slice(options.offset ?? 0, (options.offset ?? 0) + options.limit)
     return view

@@ -12,12 +12,27 @@ for (const storage of ['IndexedDB', 'memory']) {
     const events = ['proxy:accepted', 'routing:outbound_selected', 'dns:resolved', 'sniffer:protocol', 'security:checked', 'stream:closed', 'custom:event']
     const levels = ['INFO', 'DEBUG', 'WARN', 'ERROR', 'TRACE', 'INFO', 'INFO']
     const at = Date.now() - 5000
-    const record = (index: number) => JSON.stringify({ timestamp: new Date(at + index * 500).toISOString(), level: levels[index % 7], target: 'shadowquic::test', event: events[index % 7], fields: { ...(index === 6 ? {} : { req_id: 42 + index }), message: `Waterfall event ${index}`, dst: 'waterfall.example:443' }, spans: [] })
+    const record = (index: number) => JSON.stringify({ timestamp: new Date(at + index * 500).toISOString(), level: levels[index % 7], target: 'shadowquic::test', event: events[index % 7], fields: { ...(index === 6 ? {} : { req_id: 42 + index }), message: `Waterfall event ${index}`, dst: 'waterfall.example:443', ...(index === 0 ? { empty: '', attempt: 0, cached: false, context: { route: 'direct' } } : {}) }, spans: [] })
     for (let index = 0; index < 7; index++) send(record(index))
     await page.getByRole('navigation', { name: 'Log views' }).getByRole('link', { name: 'Waterfall', exact: true }).click()
     await expect(page).toHaveURL(/view=waterfall/)
     await expect(page.locator('.waterfall-row')).toHaveCount(7)
     await expect(page.locator('.waterfall-dot')).toHaveCount(7)
+    await expect(page.locator('.waterfall-event-list li')).toHaveCount(7)
+    await expect(page.locator('.waterfall-list-message').first()).toContainText('Waterfall event 0 req_id=42 dst=waterfall.example:443')
+    await expect(page.locator('.waterfall-list-message').first()).toContainText('empty="" attempt=0 cached=false context={"route":"direct"}')
+    await expect(page.locator('.waterfall-list-message').first()).not.toContainText('message=')
+    const firstRow = page.locator('.waterfall-event-button').first()
+    await expect(firstRow.locator('.waterfall-time small')).toHaveText('Request 42')
+    await expect(firstRow.locator('.waterfall-list-main small')).toHaveCount(0)
+    await expect(firstRow.locator('.waterfall-list-main')).not.toContainText('shadowquic::test')
+    await expect(firstRow.locator('.waterfall-list-main')).toHaveAttribute('title', /context=\{"route":"direct"\}/)
+    expect((await firstRow.boundingBox())!.height).toBeLessThanOrEqual(52)
+    const timestamp = (await firstRow.locator('time').boundingBox())!
+    const request = (await firstRow.locator('.waterfall-time small').boundingBox())!
+    expect(request.x).toBeCloseTo(timestamp.x, 0)
+    expect(request.y).toBeGreaterThan(timestamp.y)
+
     await expect(page.locator('.waterfall-label small')).toHaveText(Array(7).fill('1 event'))
     const colors = await page.locator('.waterfall-dot > span').evaluateAll(elements => elements.map(el => getComputedStyle(el).backgroundColor))
     expect(new Set(colors).size).toBe(7)
@@ -26,6 +41,7 @@ for (const storage of ['IndexedDB', 'memory']) {
     await page.keyboard.press('ArrowRight')
     const detail = page.getByRole('region', { name: 'Selected waterfall event' })
     await expect(detail).toContainText('Waterfall event 1')
+    await expect(page.locator('.waterfall-event-button').nth(1)).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByRole('button', { name: /routing:outbound_selected · Request 43/ })).toBeFocused()
     await page.keyboard.press('End')
     await expect(detail).toContainText('Unscoped event')
@@ -42,6 +58,8 @@ for (const storage of ['IndexedDB', 'memory']) {
       await expect(detail.locator('.waterfall-level')).toHaveCSS('color', 'rgb(237, 148, 154)')
       await page.screenshot({ path: '.impeccable/review/log-waterfall-dark.png', fullPage: true, animations: 'disabled' })
       await page.setViewportSize({ width: 390, height: 1000 })
+      expect((await firstRow.boundingBox())!.height).toBeLessThanOrEqual(52)
+      await expect(firstRow.locator('.waterfall-list-main')).toHaveAttribute('title', /attempt=0 cached=false/)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
       expect(await page.locator('.waterfall-scroll').evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true)
       await page.screenshot({ path: '.impeccable/review/log-waterfall-mobile.png', fullPage: true, animations: 'disabled' })
@@ -51,6 +69,7 @@ for (const storage of ['IndexedDB', 'memory']) {
     await eventLimit.fill('3')
     await eventLimit.press('Enter')
     await expect(page.locator('.waterfall-dot')).toHaveCount(3)
+    await expect(page.locator('.waterfall-event-list li')).toHaveCount(3)
     const axisTimes = page.locator('.waterfall-scale time')
     await expect(axisTimes.first()).toHaveAttribute('datetime', new Date(at).toISOString())
     await expect(axisTimes.last()).toHaveAttribute('datetime', new Date(at + 1000).toISOString())
@@ -85,7 +104,7 @@ for (const storage of ['IndexedDB', 'memory']) {
   })
 }
 
-test('waterfall pages every matching point and loads only the selected body', async ({ page }) => {
+test('waterfall pages matching points and loads only their event bodies', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('squirrelboard.secret', 'fixture-secret'))
   await page.routeWebSocket('**/api/v1/logs*', () => {})
   await page.goto('/#log?view=waterfall')
@@ -98,19 +117,20 @@ test('waterfall pages every matching point and loads only the selected body', as
     await db.append(location.origin, events, 5000, now)
     const options = { mode: 'waterfall', end: now, windowMs: 60_000, requestId: '', page: 1, limit: 500 }
     const pages = await Promise.all([0, 500, 1000].map(offset => db.query(location.origin, { ...options, offset })))
-    const selected = await db.query(location.origin, { ...options, eventSequence: pages[2].waterfall.points[0].sequence })
+    const selected = await db.query(location.origin, { ...options, offset: 1000 })
     const filtered = await db.query(location.origin, { ...options, level: 'WARN', offset: 1000 })
     db.close()
     return {
       sizes: pages.map(view => view.waterfall.points.length), unique: new Set(pages.flatMap(view => view.waterfall.points.map((point: any) => point.sequence))).size,
-      ranges: pages.map(view => [view.waterfall.start, view.waterfall.end]), fits: pages.every(view => view.waterfall.start === view.waterfall.points[0].at && view.waterfall.end === view.waterfall.points.at(-1).at), bodies: pages.map(view => view.events.length),
+      ranges: pages.map(view => [view.waterfall.start, view.waterfall.end]), fits: pages.every(view => view.waterfall.start === view.waterfall.points[0].at && view.waterfall.end === view.waterfall.points.at(-1).at), bodies: pages.map(view => view.events.length), parity: pages.every(view => view.events.every((event: any, index: number) => event.sequence === view.waterfall.points[index].sequence)),
       selected: selected.events.map((event: any) => event.fields.message), count: selected.waterfall.total,
       filtered: { total: filtered.waterfall.total, offset: filtered.waterfall.offset, levels: [...new Set(filtered.waterfall.points.map((point: any) => point.level))] },
     }
   })
   expect(result.sizes).toEqual([500, 500, 1])
   expect(result.unique).toBe(1001)
-  expect(result.bodies).toEqual([0, 0, 0])
+  expect(result.bodies).toEqual([500, 500, 1])
+  expect(result.parity).toBe(true)
   expect(result.fits).toBe(true)
   expect(result.ranges[0]![1]).toBeLessThan(result.ranges[1]![0]!)
   expect(result.ranges[1]![1]).toBeLessThan(result.ranges[2]![0]!)
@@ -118,11 +138,13 @@ test('waterfall pages every matching point and loads only the selected body', as
   expect(result.count).toBe(1001)
   expect(result.filtered).toEqual({ total: 333, offset: 0, levels: ['ERROR'] })
   await expect(page.locator('.waterfall-dot')).toHaveCount(500)
+  await expect(page.locator('.waterfall-event-list li')).toHaveCount(500)
   await page.getByRole('button', { name: 'Freeze view', exact: true }).click()
   await page.getByRole('button', { name: 'Next events', exact: true }).click()
   await expect(page.locator('.waterfall-pagination')).toContainText('501–1000')
   await page.getByRole('button', { name: 'Next events', exact: true }).click()
   await expect(page.locator('.waterfall-dot')).toHaveCount(1)
+  await expect(page.locator('.waterfall-event-list li')).toHaveCount(1)
   await expect(page.locator('.waterfall-pagination')).toContainText('1001–1001')
   await page.getByRole('combobox', { name: 'Log level', exact: true }).selectOption('WARN')
   await expect(page.locator('.waterfall-dot')).toHaveCount(333)
@@ -167,12 +189,26 @@ for (const width of [1440, 390]) {
       else await dots.last().click()
       const detail = page.getByRole('region', { name: 'Selected waterfall event' })
       await expect(detail).toContainText('Coincident event 11')
+      const list = page.locator('.waterfall-event-list')
+      await expect(list.locator('li')).toHaveCount(12)
+      await list.evaluate(el => el.scrollTop = el.scrollHeight)
+      const readingPosition = await page.evaluate(() => window.scrollY)
       await page.keyboard.press('Home')
       await expect(detail).toContainText('Coincident event 0')
+      await expect.poll(() => list.evaluate(el => el.scrollTop)).toBe(0)
+      expect(await page.evaluate(() => window.scrollY)).toBe(readingPosition)
       for (let index = 0; index < 5; index++) await page.keyboard.press('ArrowRight')
       await expect(detail).toContainText('Coincident event 5')
       await page.keyboard.press('End')
       await expect(detail).toContainText('Coincident event 11')
+      const listRows = list.locator('button')
+      await listRows.nth(5).click()
+      await expect(detail).toContainText('Coincident event 5')
+      await page.keyboard.press('ArrowUp')
+      await expect(detail).toContainText('Coincident event 4')
+      await expect(listRows.nth(4)).toBeFocused()
+      const sequence = await listRows.nth(4).getAttribute('data-list-sequence')
+      await expect(page.locator(`.waterfall-dot[data-event-sequence="${sequence}"]`)).toHaveAttribute('aria-pressed', 'true')
       await page.locator('.waterfall-scroll').evaluate(el => el.scrollTop = 0)
       await page.evaluate(() => window.scrollTo(0, 0))
       if (width < 740) await page.evaluate(() => document.documentElement.dataset.theme = 'dark')

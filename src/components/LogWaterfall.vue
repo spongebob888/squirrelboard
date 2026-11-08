@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { LOG_CATEGORIES, logCategory, logFields, type LogEvent } from '../lib/logs'
 import type { WaterfallPoint, WaterfallView } from '../lib/log-storage'
 
-const props = defineProps<{ data: WaterfallView; selectedSequence?: number; event?: LogEvent }>()
+const props = defineProps<{ data: WaterfallView; selectedSequence?: number; events: LogEvent[] }>()
 const emit = defineEmits<{ select: [sequence: number]; request: [id: string]; offset: [offset: number] }>()
 const chart = ref<HTMLElement | null>(null)
+const eventList = ref<HTMLOListElement | null>(null)
 const categories = Object.entries(LOG_CATEGORIES)
 const lanes = computed(() => categories.map(([category, label]) => ({ category, label, points: props.data.points.filter(point => logCategory(point.event) === category), count: props.data.counts[category as keyof typeof LOG_CATEGORIES] })))
 const range = computed(() => props.data.end - props.data.start)
@@ -14,17 +15,43 @@ const position = (point: WaterfallPoint) => range.value === 0 ? 50 : (point.at -
 const time = (at: number) => new Date(at).toLocaleTimeString([], { hour12: false }) + `.${String(new Date(at).getMilliseconds()).padStart(3, '0')}`
 const description = (point: WaterfallPoint) => `${time(point.at)} · ${point.level} · ${point.event || 'Unlabelled event'} · ${point.requestId === null ? 'Unscoped' : `Request ${point.requestId}`}`
 const tabSequence = computed(() => props.data.points.some(point => point.sequence === props.selectedSequence) ? props.selectedSequence : props.data.points[0]?.sequence)
-const detail = computed(() => props.event?.sequence === props.selectedSequence ? props.event : undefined)
+const eventsBySequence = computed(() => new Map(props.events.map(event => [event.sequence, event])))
+const entries = computed(() => props.data.points.map(point => {
+  const log = eventsBySequence.value.get(point.sequence)
+  const inlineFields = log ? logFields(log.fields) : []
+  const message = log?.fields.message
+  return { point, log, inlineFields, preview: [typeof message === 'string' ? message : JSON.stringify(message) ?? '', ...inlineFields.map(([name, value]) => `${name}=${value}`)].join(' ').trim() }
+}))
+const detail = computed(() => props.selectedSequence === undefined ? undefined : eventsBySequence.value.get(props.selectedSequence))
 const fields = computed(() => detail.value ? logFields(detail.value.fields) : [])
-async function key(event: KeyboardEvent, point: WaterfallPoint) {
+function revealListSelection(sequence: number) {
+  const list = eventList.value
+  const row = list?.querySelector<HTMLButtonElement>(`[data-list-sequence="${sequence}"]`)
+  if (!list || !row) return
+  const viewport = list.getBoundingClientRect()
+  const bounds = row.getBoundingClientRect()
+  const top = viewport.top + list.clientTop
+  const bottom = top + list.clientHeight
+  if (bounds.height > list.clientHeight || bounds.top < top) list.scrollTop += bounds.top - top
+  else if (bounds.bottom > bottom) list.scrollTop += bounds.bottom - bottom
+}
+watch(() => props.selectedSequence, async sequence => {
+  if (sequence === undefined) return
+  await nextTick()
+  revealListSelection(sequence)
+})
+async function key(event: KeyboardEvent, point: WaterfallPoint, source: 'dot' | 'list' = 'dot') {
   const index = props.data.points.findIndex(item => item.sequence === point.sequence)
-  const next = event.key === 'ArrowRight' ? Math.min(index + 1, props.data.points.length - 1) : event.key === 'ArrowLeft' ? Math.max(0, index - 1) : event.key === 'Home' ? 0 : event.key === 'End' ? props.data.points.length - 1 : -1
+  const next = (event.key === 'ArrowRight' || (source === 'list' && event.key === 'ArrowDown')) ? Math.min(index + 1, props.data.points.length - 1) : (event.key === 'ArrowLeft' || (source === 'list' && event.key === 'ArrowUp')) ? Math.max(0, index - 1) : event.key === 'Home' ? 0 : event.key === 'End' ? props.data.points.length - 1 : -1
   if (next < 0) return
   event.preventDefault()
   const sequence = props.data.points[next]!.sequence
   emit('select', sequence)
   await nextTick()
-  chart.value?.querySelector<HTMLButtonElement>(`[data-event-sequence="${sequence}"]`)?.focus()
+  if (source === 'list') {
+    eventList.value?.querySelector<HTMLButtonElement>(`[data-list-sequence="${sequence}"]`)?.focus()
+    revealListSelection(sequence)
+  } else chart.value?.querySelector<HTMLButtonElement>(`[data-event-sequence="${sequence}"]`)?.focus()
 }
 </script>
 
@@ -44,6 +71,16 @@ async function key(event: KeyboardEvent, point: WaterfallPoint) {
         </div>
       </div>
     </div>
+    <div class="waterfall-list-heading"><h3 id="waterfall-events-heading">Events</h3><span>{{ data.points.length.toLocaleString() }} on this page</span></div>
+    <ol ref="eventList" class="waterfall-event-list" aria-labelledby="waterfall-events-heading">
+      <li v-for="entry in entries" :key="entry.point.sequence">
+        <button class="waterfall-event-button" :class="[`category-${logCategory(entry.point.event)}`, { selected: selectedSequence === entry.point.sequence }]" :data-list-sequence="entry.point.sequence" :tabindex="tabSequence === entry.point.sequence ? 0 : -1" :aria-pressed="selectedSequence === entry.point.sequence" @click="emit('select', entry.point.sequence)" @keydown="key($event, entry.point, 'list')">
+          <span class="waterfall-time"><time :datetime="new Date(entry.point.at).toISOString()">{{ time(entry.point.at) }}</time><small :title="entry.point.requestId ?? 'Unscoped event'">{{ entry.point.requestId === null ? 'Unscoped' : `Request ${entry.point.requestId}` }}</small></span>
+          <span class="waterfall-list-main" :title="entry.preview"><strong><i aria-hidden="true"/>{{ entry.point.event || 'Unlabelled event' }}</strong><span class="waterfall-list-message"><span v-if="entry.log && entry.log.fields.message != null">{{ entry.log.fields.message }}</span><template v-for="[name, value] in entry.inlineFields" :key="name">{{ ' ' }}<span class="waterfall-field"><span>{{ name }}=</span>{{ value }}</span></template></span></span>
+          <span class="waterfall-level" :class="entry.point.level.toLowerCase()">{{ entry.point.level }}</span>
+        </button>
+      </li>
+    </ol>
     <div v-if="data.total > data.limit" class="waterfall-pagination"><button class="button small" :disabled="data.offset === 0" @click="emit('offset', Math.max(0, data.offset - data.limit))">Previous events</button><span>{{ data.offset + 1 }}–{{ Math.min(data.offset + data.limit, data.total) }} of {{ data.total.toLocaleString() }}</span><button class="button small" :disabled="data.offset + data.limit >= data.total" @click="emit('offset', data.offset + data.limit)">Next events</button></div>
     <p v-if="data.total > data.limit" class="waterfall-guide">Category totals cover the filtered window. Dots show this event page.</p>
     <section class="waterfall-detail" aria-label="Selected waterfall event" aria-live="polite">
@@ -93,6 +130,22 @@ async function key(event: KeyboardEvent, point: WaterfallPoint) {
 .waterfall-dot > span { width: 8px; height: 8px; border-radius: 50%; background: color-mix(in srgb, var(--event-color) 60%, var(--text)); }
 .waterfall-dot:hover, .waterfall-dot.selected { background: var(--primary-soft); z-index: 1; }
 .waterfall-dot.selected > span { outline: 1px solid var(--text); outline-offset: 2px; }
+.waterfall-list-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 16px 0 8px; }
+.waterfall-list-heading h3 { margin: 0; font-size: 14px; }
+.waterfall-list-heading > span { color: var(--secondary); font-size: 12px; }
+.waterfall-event-list { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; overscroll-behavior-y: contain; border: 1px solid var(--border); border-radius: 7px; }
+.waterfall-event-list li + li { border-top: 1px solid var(--line); }
+.waterfall-event-button { width: 100%; display: grid; grid-template-columns: 100px minmax(0, 1fr) auto; gap: 8px 12px; padding: 8px 12px; text-align: left; font-size: 12px; }
+.waterfall-event-button:hover { background: var(--bg); }
+.waterfall-event-button.selected { background: var(--primary-soft); }
+.waterfall-event-button:focus-visible { outline-offset: -2px; }
+.waterfall-event-button time, .waterfall-event-button > .waterfall-level { color: var(--secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.waterfall-event-button > .waterfall-level.warn { color: var(--amber); }
+.waterfall-event-button > .waterfall-level.error { color: var(--red); }
+.waterfall-list-main { min-width: 0; display: grid; grid-template-rows: 16px 16px; gap: 2px; line-height: 16px; }
+.waterfall-list-main strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 16px; font-weight: 600; color: color-mix(in srgb, var(--event-color) 60%, var(--text)); }
+.waterfall-list-main i { display: inline-block; width: 6px; height: 6px; margin-right: 6px; vertical-align: 1px; border-radius: 50%; background: var(--event-color); }
+.waterfall-list-message { display: block; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 16px; }
 .waterfall-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; padding-top: 14px; font-size: 12px; color: var(--secondary); }
 .waterfall-detail { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; font-size: 12px; }
 .waterfall-detail > p { color: var(--secondary); margin: 8px 0; }
@@ -105,5 +158,14 @@ async function key(event: KeyboardEvent, point: WaterfallPoint) {
 .waterfall-detail summary { cursor: pointer; padding: 8px 0; color: var(--secondary); }
 .waterfall-detail pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; background: var(--bg); border-radius: 7px; line-height: 1.6; }
 .waterfall-detail .text-button { margin-top: 12px; }
-@media (max-width: 740px) { .log-waterfall { padding-inline: 15px; } .waterfall-axis, .waterfall-row { grid-template-columns: 115px minmax(0, 1fr); } }
+.waterfall-time { display: grid; grid-template-rows: 16px 16px; gap: 2px; min-width: 0; color: var(--secondary); font-size: 11px; line-height: 16px; font-variant-numeric: tabular-nums; }
+.waterfall-time small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+@media (max-width: 740px) {
+  .log-waterfall { padding-inline: 15px; }
+  .waterfall-axis, .waterfall-row { grid-template-columns: 115px minmax(0, 1fr); }
+  .waterfall-event-button { grid-template-columns: 88px minmax(0, 1fr) auto; gap: 6px; }
+  .waterfall-time { grid-column: 1; grid-row: 1; }
+  .waterfall-list-main { grid-column: 2; grid-row: 1; }
+  .waterfall-event-button > .waterfall-level { grid-column: 3; grid-row: 1; }
+}
 </style>

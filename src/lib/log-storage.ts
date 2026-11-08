@@ -11,7 +11,7 @@ export function validLogLimit(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1000 && value <= MAX_LOG_LIMIT
 }
 export interface LogQuery {
-  end: number; windowMs: number; requestId: string; selectedId?: string | null; level?: string; page: number; limit: number; offset?: number; mode?: 'waterfall'; eventSequence?: number
+  end: number; windowMs: number; requestId: string; selectedId?: string | null; level?: string; page: number; limit: number; offset?: number; mode?: 'waterfall'
 }
 interface Overview {
   sequence: number; scope: string; receivedAt: number; at: number; requestId: string | null; level: string; event: string | null; metadata: RequestMetadata; destinationPriority?: number
@@ -133,7 +133,7 @@ export class LogDatabase {
     const view = summarizeLogs(rows, query)
     if (query.mode === 'waterfall') view.waterfall = summarizeWaterfall(rows, query)
     const ids = query.mode === 'waterfall'
-      ? rows.filter(row => row.sequence === query.eventSequence && row.receivedAt >= query.end - query.windowMs && logLevelMatches(row.level, query.level)).map(row => row.sequence)
+      ? view.waterfall!.points.map(point => point.sequence)
       : view.selected ? rows.filter(row => row.requestId === view.selected!.id && row.receivedAt >= query.end - query.windowMs && logLevelMatches(row.level, query.level))
       .sort((a, b) => a.at - b.at || a.sequence - b.sequence).slice(query.offset ?? 0, (query.offset ?? 0) + query.limit).map(row => row.sequence) : []
     // Queue all reads in the same transaction so eviction cannot tear the result.
@@ -192,7 +192,7 @@ export function summarizeLogs(rows: Overview[], query: LogQuery): LogView {
   return { requests: all.slice((page - 1) * 30, page * 30), totalRequests: all.length, totalEvents, pages, page, selected, events: [] }
 }
 
-/** Page compact event points; full bodies are read only when a dot is selected. */
+/** Page event points and bound the bodies loaded for the matching event list. */
 export function summarizeWaterfall(rows: Overview[], query: LogQuery): WaterfallView {
   const matching = rows.filter(row => row.receivedAt >= query.end - query.windowMs && row.receivedAt <= query.end && (!query.requestId || row.requestId === query.requestId) && logLevelMatches(row.level, query.level))
     .sort((a, b) => a.at - b.at || a.sequence - b.sequence)
