@@ -35,3 +35,9 @@ Retain captured events by backend address in IndexedDB for 30 minutes, with a br
 ## Stable reading position
 
 The request list scrolls independently within 70vh on desktop and 250px on mobile, with scroll anchoring disabled only for that list. Preserve normal timeline anchoring and keyboard focus. Live request reordering must not move the event being read. Explicit selections remain explicit when their events leave the time window; show an unavailable-selection message instead of opening the newest request automatically.
+
+## Log storage help
+
+Show a compact stored-event count and 30-minute retention summary. Keep storage limits, timing semantics, and request ID matching in the adjacent info tooltip. Reveal it on hover, keyboard focus, or touch focus; allow Escape dismissal and pointer travel into the tip. Keep the 320px tooltip inside the mobile viewport.
+
+Capture completeness shares this summary: show an amber warning icon and “Capture incomplete” beside retention whenever drop, interruption, eviction, or unreadable-record counts are nonzero. Put all four counts in the same hover/focus tooltip above storage and timing help. Keep connection and storage failures as separate actionable messages.

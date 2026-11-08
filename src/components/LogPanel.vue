@@ -14,6 +14,8 @@ const eventOffset = ref(0)
 const view = shallowRef(emptyLogView())
 const loading = ref(true)
 const queryError = ref('')
+const helpDismissed = ref(false)
+const hasCaptureIssues = computed(() => !!(props.dropped || props.gaps || props.evicted || props.invalid))
 let running = false
 let dirty = false
 let alive = true
@@ -79,11 +81,23 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
       <button v-if="requestId" class="text-button" @click="emit('request', '')">Clear filter</button>
       <span v-if="frozen" class="log-frozen">View frozen at {{ time(end) }}. Capture and retention continue.</span>
     </div>
-    <p class="log-note">Browser log storage · retained for 30 minutes, up to {{ maxEvents.toLocaleString() }} events across backends. {{ storedCount.toLocaleString() }} stored for this backend. Change the limit in Settings. Windows use arrival time; timelines use server timestamps. Session ID in Connections matches req_id.</p>
+    <p class="log-note log-help-summary">
+      <span><strong>{{ storedCount.toLocaleString() }}</strong> stored <span class="log-help-separator">·</span> 30 min retention</span>
+      <span class="log-help-item" :class="{ dismissed: helpDismissed, 'capture-warning': hasCaptureIssues }" @mouseleave="helpDismissed = false" @focusin="helpDismissed = false" @keydown.esc.stop.prevent="helpDismissed = true">
+        <button type="button" class="log-help-trigger" aria-describedby="log-help-details" :aria-label="hasCaptureIssues ? 'Log storage and capture details' : 'Log storage and timing details'" @click="helpDismissed = false">
+          <svg v-if="hasCaptureIssues" viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="m10 2 8 15H2L10 2Z" stroke-linejoin="round"/><path d="M10 7v4M10 13v1"/></svg>
+          <svg v-else viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="M10 9v5M10 5.5v1"/></svg>
+          <span v-if="hasCaptureIssues">Capture incomplete</span>
+        </button>
+        <span id="log-help-details" role="tooltip" class="log-help-tip">
+          <span v-if="hasCaptureIssues" class="log-capture-counts"><strong>Capture may be incomplete</strong><span>{{ dropped }} server-dropped events</span><span>{{ gaps }} stream interruptions</span><span>{{ evicted }} events removed at the buffer limit</span><span>{{ invalid }} unreadable records</span></span>
+          <span>Retained for 30 minutes, up to {{ maxEvents.toLocaleString() }} events across backends. {{ storedCount.toLocaleString() }} stored for this backend. Change the limit in Settings. Windows use arrival time; timelines use server timestamps. Session ID in Connections matches req_id.</span>
+        </span>
+      </span>
+    </p>
     <p v-if="storageError || queryError" class="log-warning" role="status">{{ storageError || queryError }}</p>
     <p v-if="state.includes('Unavailable')" class="log-warning" role="status">Cannot open the log stream. Check the API secret, backend support for /api/v1/logs, and WebSocket proxy settings. Retained events remain available.</p>
     <p v-if="state === 'Paused'" class="log-warning">Capture is paused while dashboard updates are paused or this tab is hidden. Events during this time cannot be replayed.</p>
-    <p v-if="dropped || gaps || evicted || invalid" class="log-warning">Capture may be incomplete: {{ dropped }} server-dropped events, {{ gaps }} stream interruptions, {{ evicted }} events removed at the buffer limit, {{ invalid }} unreadable records.</p>
     <div v-if="view.totalRequests" class="log-workspace">
       <aside class="log-requests" aria-label="Captured requests">
         <div class="log-list-heading">{{ view.totalRequests }} {{ view.totalRequests === 1 ? 'request' : 'requests' }} <span>Observed span</span></div>
@@ -98,7 +112,7 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
       <div v-if="selected" class="log-timeline">
         <div class="log-timeline-heading"><h3>{{ selected.id === null ? 'Unscoped events' : `Request ${selected.id}` }}</h3><span>{{ elapsed(selected.last.at - selected.first.at) }} observed · {{ selected.count }} events</span></div>
         <p v-if="hasMetadata" class="log-destination">{{ metadata.destination || 'Unknown destination' }}<template v-if="metadata.protocol"> · {{ metadata.protocol }}</template><template v-if="metadata.inbound"> · Inbound: {{ metadata.inbound }}</template><template v-if="metadata.outbound"> · Outbound: {{ metadata.outbound }}</template></p>
-        <p class="log-note timeline-note">{{ selected.id === null ? 'These events have no req_id and cannot be assigned to a request.' : 'Offsets start at the first captured event in this window; they may not cover the full request.' }}</p>
+        <p v-if="selected.id === null" class="log-note timeline-note">These events have no req_id and cannot be assigned to a request.</p>
         <ul class="log-legend" aria-label="Event categories"><li v-for="category in categories" :key="category" :class="`category-${category}`"><i aria-hidden="true"/>{{ LOG_CATEGORIES[category] }}</li></ul>
         <ol class="log-events">
           <li v-for="event in visibleEvents" :key="event.sequence" :class="[event.level.toLowerCase(), `category-${logCategory(event.event)}`]">
@@ -118,7 +132,7 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
 </template>
 
 <style scoped>
-.log-panel { min-width: 0; --log-connection: #3979ad; --log-sniffing: #9161ad; }
+.log-panel { min-width: 0; overflow: visible; --log-connection: #3979ad; --log-sniffing: #9161ad; }
 :global([data-theme=dark] .log-panel) { --log-connection: #8abded; --log-sniffing: #c5a0e3; }
 .category-connection { --event-color: var(--log-connection); }
 .category-routing { --event-color: var(--primary); }
@@ -137,6 +151,20 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
 .log-filters input::placeholder { color: var(--secondary); }
 .log-filters input, .log-filters select { min-height: 38px; width: 210px; max-width: 100%; }
 .log-note { margin: 0; padding: 0 21px 16px; font-size: 12px; color: var(--secondary); line-height: 1.6; }
+
+.log-help-summary { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding-bottom: 12px; }
+.log-help-summary strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.log-help-separator { margin: 0 5px; }
+.log-help-item { position: relative; display: inline-flex; }
+.log-help-trigger { display: inline-flex; gap: 6px; align-items: center; justify-content: center; min-height: 32px; min-width: 32px; padding: 6px; border-radius: 7px; color: var(--secondary); background: transparent; font: inherit; cursor: help; }
+.log-help-trigger:hover, .log-help-trigger:focus-visible { color: var(--primary); }
+.log-help-tip { display: none; position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; width: 320px; max-width: calc(100vw - 72px); padding: 12px 14px; border-radius: 7px; color: var(--text); background: var(--surface); box-shadow: 0 5px 20px #0003; font-size: 12px; font-weight: 400; line-height: 1.65; white-space: normal; }
+.capture-warning .log-help-trigger { color: var(--amber); }
+.capture-warning .log-help-trigger:hover, .capture-warning .log-help-trigger:focus-visible { color: var(--text); }
+.log-capture-counts { display: grid; gap: 2px; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
+.log-capture-counts strong { margin-bottom: 4px; }
+.log-help-tip::before { content: ''; position: absolute; top: -8px; left: 0; width: 100%; height: 8px; }
+.log-help-item:not(.dismissed):hover .log-help-tip, .log-help-item:not(.dismissed):focus-within .log-help-tip { display: block; }
 .log-warning { margin: 0 21px 16px; padding: 12px; background: var(--bg); color: var(--text); font-size: 12px; border: 1px solid var(--border); border-radius: 7px; }
 .log-frozen { color: var(--secondary); font-size: 12px; }
 .log-workspace { display: grid; grid-template-columns: 260px minmax(0, 1fr); border-top: 1px solid var(--border); }
@@ -185,6 +213,8 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
   .log-workspace { grid-template-columns: minmax(0, 1fr); }
   .log-requests { max-height: 250px; overflow: auto; border-right: 0; border-bottom: 1px solid var(--border); }
   .log-heading { align-items: flex-start; }
+  .log-help-item { position: static; }
+  .log-help-tip { left: 15px; }
   .log-filters { padding-inline: 15px; }
   .log-filters label { flex: 1 1 120px; min-width: 0; }
   .log-filters input, .log-filters select { width: 100%; }
