@@ -1,13 +1,34 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { LOG_CATEGORIES, logCategory, logFields, requestMetadata, type LogEvent, type RequestMetadata } from '../lib/logs'
-import { emptyLogView, type LogQuery, type LogView, type RequestSummary } from '../lib/log-storage'
+import { DEFAULT_WATERFALL_LIMIT, MAX_WATERFALL_LIMIT, validWaterfallLimit, emptyLogView, type LogQuery, type LogView, type RequestSummary } from '../lib/log-storage'
+import LogWaterfall from './LogWaterfall.vue'
+import { formatFragment, parseFragment } from '../lib/location'
 import type { Connection } from '../lib/types'
 
-const props = defineProps<{ revision: number; storageEpoch: number; storedCount: number; maxEvents: number; storageError: string; query: (options: LogQuery) => Promise<LogView>; now: number; state: string; dropped: number; invalid: number; evicted: number; gaps: number; requestId: string; connections: Connection[] }>()
-const emit = defineEmits<{ request: [id: string]; retry: [] }>()
+const props = defineProps<{ revision: number; storageEpoch: number; storedCount: number; maxEvents: number; storageError: string; query: (options: LogQuery) => Promise<LogView>; now: number; state: string; dropped: number; invalid: number; evicted: number; gaps: number; requestId: string; viewMode?: string; connections: Connection[] }>()
+const emit = defineEmits<{ request: [id: string]; retry: []; view: [mode: string] }>()
 const windowMs = ref(300_000)
 const level = ref('')
+const waterfallLimit = ref(DEFAULT_WATERFALL_LIMIT)
+try {
+  const saved = Number(localStorage.getItem('squirrelboard.waterfallLimit'))
+  if (validWaterfallLimit(saved)) waterfallLimit.value = saved
+} catch { /* Preferences can be unavailable while the view remains usable. */ }
+function setWaterfallLimit(event: Event) {
+  const input = event.target as HTMLInputElement
+  if (!validWaterfallLimit(input.valueAsNumber)) { input.reportValidity(); return }
+  waterfallLimit.value = input.valueAsNumber
+  try { localStorage.setItem('squirrelboard.waterfallLimit', String(waterfallLimit.value)) } catch { /* Apply for this view. */ }
+}
+const isWaterfall = computed(() => props.viewMode === 'waterfall')
+const eventSequence = ref<number | undefined>(undefined)
+function viewHref(mode: string) {
+  const params = parseFragment(location.hash).params
+  if (mode === 'waterfall') params.set('view', mode); else params.delete('view')
+  return `#${formatFragment('log', params)}`
+}
+function openRequest(id: string) { selectedId.value = id; emit('request', id); emit('view', 'requests') }
 const frozen = ref<number | null>(null)
 const selectedId = ref<string | null | undefined>(props.requestId || undefined)
 const requestPage = ref(1)
@@ -22,8 +43,8 @@ let dirty = false
 let alive = true
 onBeforeUnmount(() => { alive = false })
 const end = computed(() => frozen.value ?? props.now)
-const options = (): LogQuery => ({ end: end.value, windowMs: windowMs.value, level: level.value, requestId: props.requestId.trim(), selectedId: selectedId.value, page: requestPage.value, limit: 100, offset: eventOffset.value })
-const controls = () => JSON.stringify([props.storageEpoch, windowMs.value, level.value, props.requestId, selectedId.value === undefined ? ['auto'] : ['explicit', selectedId.value], requestPage.value, eventOffset.value, frozen.value])
+const options = (): LogQuery => ({ end: end.value, windowMs: windowMs.value, level: level.value, requestId: props.requestId.trim(), selectedId: selectedId.value, page: requestPage.value, mode: isWaterfall.value ? 'waterfall' : undefined, eventSequence: eventSequence.value, limit: isWaterfall.value ? waterfallLimit.value : 100, offset: eventOffset.value })
+const controls = () => JSON.stringify([props.storageEpoch, props.viewMode, waterfallLimit.value, eventSequence.value, windowMs.value, level.value, props.requestId, selectedId.value === undefined ? ['auto'] : ['explicit', selectedId.value], requestPage.value, eventOffset.value, frozen.value])
 async function load() {
   dirty = true
   if (running) return
@@ -37,7 +58,8 @@ async function load() {
         if (alive && key === controls()) {
           view.value = result
           requestPage.value = result.page
-          if (eventOffset.value >= (result.selected?.count ?? 0) && eventOffset.value > 0) eventOffset.value = 0
+          if (isWaterfall.value && result.waterfall) eventOffset.value = result.waterfall.offset
+          if (!isWaterfall.value && eventOffset.value >= (result.selected?.count ?? 0) && eventOffset.value > 0) eventOffset.value = 0
           queryError.value = ''
         }
       } catch {
@@ -47,7 +69,8 @@ async function load() {
   } finally { running = false }
 }
 watch(() => props.requestId, id => { selectedId.value = id || undefined; requestPage.value = 1; eventOffset.value = 0 })
-watch([windowMs, level], () => { requestPage.value = 1; eventOffset.value = 0 })
+watch([windowMs, level, waterfallLimit, () => props.requestId, () => props.viewMode], () => { requestPage.value = 1; eventOffset.value = 0; eventSequence.value = undefined })
+watch(eventOffset, () => { eventSequence.value = undefined })
 watch(() => props.storageEpoch, () => { frozen.value = null; view.value = emptyLogView(); loading.value = true })
 watch(controls, () => { void load() }, { immediate: true })
 watch(() => props.revision, () => { if (frozen.value === null) void load() })
@@ -72,14 +95,16 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
 
 <template>
   <section class="panel log-panel" aria-label="Request logs">
+    <nav class="log-subpages" aria-label="Log views"><a :href="viewHref('requests')" :aria-current="!isWaterfall ? 'page' : undefined" @click.prevent="emit('view', 'requests')">Request timelines</a><a :href="viewHref('waterfall')" :aria-current="isWaterfall ? 'page' : undefined" @click.prevent="emit('view', 'waterfall')">Waterfall</a></nav>
     <div class="panel-heading log-heading">
-      <div><h2>Request timelines</h2><p><span class="status-dot" :class="{ online: state === 'Live' }"/>{{ state }} · {{ view.totalEvents.toLocaleString() }} events in window</p></div>
+      <div><h2>{{ isWaterfall ? 'Event waterfall' : 'Request timelines' }}</h2><p><span class="status-dot" :class="{ online: state === 'Live' }"/>{{ state }} · {{ view.totalEvents.toLocaleString() }} events in window</p></div>
       <div class="log-actions"><button class="button" :aria-pressed="!!frozen" @click="freeze">{{ frozen ? 'Follow live' : 'Freeze view' }}</button><button v-if="state.includes('Unavailable')" class="button" @click="emit('retry')">Retry stream</button></div>
     </div>
     <div class="log-filters">
       <label>Request ID<input :value="requestId" placeholder="All requests" @input="emit('request', ($event.target as HTMLInputElement).value)"/></label>
       <label>Time window<select v-model="windowMs"><option :value="60_000">Last minute</option><option :value="300_000">Last 5 minutes</option><option :value="900_000">Last 15 minutes</option><option :value="1_800_000">Last 30 minutes</option></select></label>
       <label>Log level<select v-model="level"><option value="">All levels</option><option v-for="value in ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE']" :key="value" :value="value">{{ value === 'ERROR' ? value : `${value} and above` }}</option></select></label>
+      <label v-if="isWaterfall">Events per page<input type="number" :value="waterfallLimit" min="1" :max="MAX_WATERFALL_LIMIT" step="1" title="1 to 10,000 events" @change="setWaterfallLimit" @keydown.enter.prevent="setWaterfallLimit"/></label>
       <button v-if="requestId" class="text-button" @click="emit('request', '')">Clear filter</button>
       <span v-if="frozen" class="log-frozen">View frozen at {{ time(end) }}. Capture and retention continue.</span>
     </div>
@@ -100,7 +125,8 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
     <p v-if="storageError || queryError" class="log-warning" role="status">{{ storageError || queryError }}</p>
     <p v-if="state.includes('Unavailable')" class="log-warning" role="status">Cannot open the log stream. Check the API secret, backend support for /api/v1/logs, and WebSocket proxy settings. Retained events remain available.</p>
     <p v-if="state === 'Paused'" class="log-warning">Capture is paused while dashboard updates are paused or this tab is hidden. Events during this time cannot be replayed.</p>
-    <div v-if="view.totalRequests" class="log-workspace">
+    <LogWaterfall v-if="isWaterfall && view.waterfall?.total" :data="view.waterfall" :selected-sequence="eventSequence" :event="view.events[0]" @select="eventSequence = $event" @offset="eventOffset = $event" @request="openRequest"/>
+    <div v-else-if="!isWaterfall && view.totalRequests" class="log-workspace">
       <aside class="log-requests" aria-label="Captured requests">
         <div class="log-list-heading">{{ view.totalRequests }} {{ view.totalRequests === 1 ? 'request' : 'requests' }} <span>Observed span</span></div>
         <button v-for="request in visible" :key="request.id ?? 'unscoped'" class="log-request" :class="{ selected: selected?.id === request.id }" :aria-pressed="selected?.id === request.id" @click="select(request.id)">
@@ -134,6 +160,10 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
 </template>
 
 <style scoped>
+.log-subpages { display: flex; flex-direction: row; gap: 20px; padding: 0 21px; border-bottom: 1px solid var(--border); }
+.log-subpages a { display: block; padding: 14px 0 12px; border-bottom: 2px solid transparent; color: var(--secondary); font-size: 12px; text-decoration: none; }
+.log-subpages a[aria-current=page] { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+.log-subpages a:hover { color: var(--text); }
 .log-panel { min-width: 0; overflow: visible; --log-connection: #3979ad; --log-sniffing: #9161ad; }
 :global([data-theme=dark] .log-panel) { --log-connection: #8abded; --log-sniffing: #c5a0e3; }
 .category-connection { --event-color: var(--log-connection); }

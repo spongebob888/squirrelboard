@@ -29,14 +29,21 @@ const page = ref<Page>(hashPage())
 const sidebarOpen = ref(false)
 function navigate(name: Page) { page.value = name; location.hash = formatFragment(name.toLowerCase(), parseFragment(location.hash).params); sidebarOpen.value = false }
 const logRequestId = ref(parseFragment(location.hash).params.get('req_id') || '')
-const onHash = () => { page.value = hashPage(); logRequestId.value = parseFragment(location.hash).params.get('req_id') || '' }
+const logView = ref(parseFragment(location.hash).params.get('view') === 'waterfall' ? 'waterfall' : 'requests')
+const onHash = () => { page.value = hashPage(); logRequestId.value = parseFragment(location.hash).params.get('req_id') || ''; logView.value = parseFragment(location.hash).params.get('view') === 'waterfall' ? 'waterfall' : 'requests' }
 function filterLog(id: string) {
   logRequestId.value = id
   const params = parseFragment(location.hash).params
   if (id) params.set('req_id', id); else params.delete('req_id')
   window.history.replaceState({}, '', `#${formatFragment('log', params)}`)
 }
-function viewRequestLog(id: string) { detail.value = null; navigate('Log'); filterLog(String(id)) }
+function setLogView(view: string) {
+  logView.value = view
+  const params = parseFragment(location.hash).params
+  if (view === 'waterfall') params.set('view', view); else params.delete('view')
+  location.hash = formatFragment('log', params)
+}
+function viewRequestLog(id: string) { detail.value = null; navigate('Log'); filterLog(String(id)); setLogView('requests') }
 window.addEventListener('hashchange', onHash)
 onBeforeUnmount(() => window.removeEventListener('hashchange', onHash))
 function shortcut(event: KeyboardEvent) {
@@ -225,7 +232,7 @@ function exportConnections() {
           <TokioMetrics :metrics="data.tokioMetric" :note="data.tokioMetricNote"/>
         </template>
 
-        <LogPanel v-if="page === 'Log'" v-bind="logs" :request-id="logRequestId" :connections="data.connections" @request="filterLog" @retry="logs.retry"/>
+        <LogPanel v-if="page === 'Log'" v-bind="logs" :request-id="logRequestId" :view-mode="logView" :connections="data.connections" @view="setLogView" @request="filterLog" @retry="logs.retry"/>
 
         <template v-if="page === 'Settings'">
           <div class="settings-grid"><section class="panel"><div class="panel-heading"><div class="selector-title"><span class="section-icon"><Server :size="19"/></span><div><h2>Backend connection</h2><p>Connect to your Shadowquic REST API</p></div></div><span v-if="demo" class="subtle-chip">Demo active</span></div><form class="settings-form" @submit.prevent="saveBackend()"><label>Connection name<input v-model="settings.name" placeholder="Local Shadowquic" maxlength="80"/></label><label>API address<input v-model="settings.url" type="url" placeholder="Same origin (recommended)"/><small>With Vite dev or preview, leave this empty. Set SHADOWQUIC_API_URL on the dashboard server to choose a backend. Entering a URL here bypasses that proxy and requires CORS support on the API server.</small></label><label>API secret <span class="optional">optional</span><input v-model="settings.secret" type="password" placeholder="Your bearer token" autocomplete="off"/><small>Your secret is kept in this browser tab’s session storage.</small></label><label>Refresh interval<select v-model="settings.interval"><option :value="1000">1 second</option><option :value="2000">2 seconds</option><option :value="5000">5 seconds</option><option :value="10000">10 seconds</option></select></label><div v-if="formError" class="form-message error" role="alert">{{ formError }}</div><div v-if="savedMessage" class="form-message success" role="status"><Check :size="16"/>{{ savedMessage }}</div><div class="form-actions"><button class="button primary" type="submit" :disabled="settingsBusy"><LoaderCircle v-if="settingsBusy" :size="15" class="spin"/><Wifi v-else :size="15"/>{{ settingsBusy ? 'Connecting…' : 'Save & connect' }}</button><button type="button" class="button" @click="reset(true); toast('Demo workspace opened. Your backend settings are preserved.')">Explore demo</button></div></form></section>

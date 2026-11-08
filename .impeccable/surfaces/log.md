@@ -45,3 +45,18 @@ Capture completeness shares this summary: show an amber warning icon and “Capt
 ## Log level filter
 
 Place a native Log level select immediately after Time window. Default to All levels, with minimum ERROR, WARN, INFO, DEBUG, and TRACE choices. Include events at the selected level and above (INFO includes INFO, WARN, and ERROR); label thresholds explicitly. Filter summaries, counts, markers, and event pages consistently in IndexedDB and memory, while retaining request metadata from other levels. Reset pagination when filters change; preserve explicit request selection and explain no matches. Capture and storage keep all levels.
+
+## Event waterfall
+
+THESIS: Compare captured event timing across fixed category lanes; each plotted dot is one event.
+OWN-WORLD: Inherit Quiet Network Console typography, bordered surfaces, theme tokens, and the established category colors.
+STORY: Open Waterfall under Log, filter the shared arrival window and minimum level, then select a dot to inspect its timestamp, request ID, message, fields, and spans. Jump to its request timeline when needed.
+FIRST VIEWPORT: Subpage links precede the existing filters. A horizontal server-time axis spans seven compact category lanes with colored event dots; selected-event details follow the chart. Mobile keeps readable lanes in a horizontally scrollable region.
+FORM: An ordinary extension with category rows confirmed by the user. Fit each page’s axis endpoints to its earliest and latest plotted timestamps. Page a configurable number of compact points (default 500, 1–10,000), without sampling or silently dropping dots; load full event bodies only on selection. Freeze keeps the inspected window fixed. No concept roll for this specified extension.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+
+Each category stays in one compact row regardless of event density. The user explicitly wants overlapping dots left overlapping. Preserve exact horizontal timestamps and every point; use chronological keyboard navigation to inspect coincident events. Keep the chart naturally sized, with horizontal scrolling on mobile.
+
+Events per page is a waterfall-only number field beside the shared filters. Save it in browser preferences; changing it resets the event page. Both axis endpoints follow the minimum and maximum timestamp among displayed dots. With one timestamp, center the overlapping dots and show that same timestamp at both endpoints. Keep WARN and ERROR level text independently amber/red in the selected-event details.
+
+Finish evidence: final desktop light/dark, mobile, and coincident-event captures preserve the incumbent DESIGN.md and token sidecar unchanged. The reviewer scored independent severity styling resolved and passed the page-fitted axis and configurable limit additions at their reviewed scope. Browser checks cover custom event limits, persistence, pagination, exact axis endpoints, deliberate overlap, and keyboard inspection. README.md documents the final behavior. No shipping raster assets were introduced.

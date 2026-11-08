@@ -1,12 +1,17 @@
-import { LOG_RETENTION_MS, logCategory, logLevelMatches, requestMetadata, type LogCategory, type LogEvent, type RequestMetadata } from './logs'
+import { LOG_CATEGORIES, LOG_RETENTION_MS, logCategory, logLevelMatches, requestMetadata, type LogCategory, type LogEvent, type RequestMetadata } from './logs'
 
+export const DEFAULT_WATERFALL_LIMIT = 500
+export const MAX_WATERFALL_LIMIT = 10_000
+export function validWaterfallLimit(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_WATERFALL_LIMIT
+}
 export const DEFAULT_LOG_LIMIT = 100_000
 export const MAX_LOG_LIMIT = 1_000_000
 export function validLogLimit(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1000 && value <= MAX_LOG_LIMIT
 }
 export interface LogQuery {
-  end: number; windowMs: number; requestId: string; selectedId?: string | null; level?: string; page: number; limit: number; offset?: number
+  end: number; windowMs: number; requestId: string; selectedId?: string | null; level?: string; page: number; limit: number; offset?: number; mode?: 'waterfall'; eventSequence?: number
 }
 interface Overview {
   sequence: number; scope: string; receivedAt: number; at: number; requestId: string | null; level: string; event: string | null; metadata: RequestMetadata; destinationPriority?: number
@@ -22,9 +27,15 @@ export interface RequestSummary {
   markers: { sequence: number; at: number; event: string | null }[]
   metadata: RequestMetadata; categories: LogCategory[]
 }
+export interface WaterfallPoint {
+  sequence: number; at: number; requestId: string | null; event: string | null; level: string
+}
+export interface WaterfallView {
+  points: WaterfallPoint[]; counts: Record<LogCategory, number>; total: number; start: number; end: number; offset: number; limit: number
+}
 export interface LogView {
   requests: RequestSummary[]; totalRequests: number; totalEvents: number; pages: number; page: number
-  selected: RequestSummary | null; events: LogEvent[]
+  selected: RequestSummary | null; events: LogEvent[]; waterfall?: WaterfallView
 }
 export const emptyLogView = (): LogView => ({ requests: [], totalRequests: 0, totalEvents: 0, pages: 1, page: 1, selected: null, events: [] })
 const result = <T>(request: IDBRequest<T>) => new Promise<T>((resolve, reject) => {
@@ -120,7 +131,10 @@ export class LogDatabase {
     const range = IDBKeyRange.bound([...key, Math.max(0, query.end - LOG_RETENTION_MS)], [...key, query.end])
     const rows = await result<Overview[]>(tx.objectStore('overview').index(query.requestId ? 'requestTime' : 'scopeTime').getAll(range))
     const view = summarizeLogs(rows, query)
-    const ids = view.selected ? rows.filter(row => row.requestId === view.selected!.id && row.receivedAt >= query.end - query.windowMs && logLevelMatches(row.level, query.level))
+    if (query.mode === 'waterfall') view.waterfall = summarizeWaterfall(rows, query)
+    const ids = query.mode === 'waterfall'
+      ? rows.filter(row => row.sequence === query.eventSequence && row.receivedAt >= query.end - query.windowMs && logLevelMatches(row.level, query.level)).map(row => row.sequence)
+      : view.selected ? rows.filter(row => row.requestId === view.selected!.id && row.receivedAt >= query.end - query.windowMs && logLevelMatches(row.level, query.level))
       .sort((a, b) => a.at - b.at || a.sequence - b.sequence).slice(query.offset ?? 0, (query.offset ?? 0) + query.limit).map(row => row.sequence) : []
     // Queue all reads in the same transaction so eviction cannot tear the result.
     const events = await Promise.all(ids.map(id => result(tx.objectStore('events').get(id))))
@@ -130,7 +144,7 @@ export class LogDatabase {
   }
 }
 
-export function summarizeLogs(rows: Overview[], query: LogQuery): LogView {
+function groupLogs(rows: Overview[], query: LogQuery) {
   const groups = new Map<string | null, RequestSummary>()
   const metadata = new Map<string | null, RequestMetadata>()
   const destinationPriority = new Map<string | null, number>()
@@ -165,10 +179,27 @@ export function summarizeLogs(rows: Overview[], query: LogQuery): LogView {
     if (group.markers.length > 100) group.markers.shift()
   }
   const all = [...groups.values()].sort((a, b) => b.last.receivedAt - a.last.receivedAt)
+  return { all, totalEvents }
+}
+
+export function summarizeLogs(rows: Overview[], query: LogQuery): LogView {
+  const { all, totalEvents } = groupLogs(rows, query)
   const pages = Math.max(1, Math.ceil(all.length / 30))
   const page = Math.min(pages, Math.max(1, query.page))
   const selected = (query.selectedId !== undefined
     ? all.find(group => group.id === query.selectedId)
     : query.requestId ? all.find(group => group.id === query.requestId) : all[0]) ?? null
   return { requests: all.slice((page - 1) * 30, page * 30), totalRequests: all.length, totalEvents, pages, page, selected, events: [] }
+}
+
+/** Page compact event points; full bodies are read only when a dot is selected. */
+export function summarizeWaterfall(rows: Overview[], query: LogQuery): WaterfallView {
+  const matching = rows.filter(row => row.receivedAt >= query.end - query.windowMs && row.receivedAt <= query.end && (!query.requestId || row.requestId === query.requestId) && logLevelMatches(row.level, query.level))
+    .sort((a, b) => a.at - b.at || a.sequence - b.sequence)
+  const limit = validWaterfallLimit(query.limit) ? query.limit : DEFAULT_WATERFALL_LIMIT
+  const offset = Math.min(Math.max(0, query.offset ?? 0), Math.max(0, Math.ceil(matching.length / limit) - 1) * limit)
+  const points = matching.slice(offset, offset + limit).map(({ sequence, at, requestId, event, level }) => ({ sequence, at, requestId, event, level }))
+  const counts = Object.fromEntries(Object.keys(LOG_CATEGORIES).map(category => [category, 0])) as Record<LogCategory, number>
+  for (const row of matching) counts[logCategory(row.event)]++
+  return { points, counts, total: matching.length, start: points[0]?.at ?? query.end, end: points.at(-1)?.at ?? query.end, offset, limit }
 }
