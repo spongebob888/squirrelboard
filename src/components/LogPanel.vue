@@ -7,6 +7,7 @@ import type { Connection } from '../lib/types'
 const props = defineProps<{ revision: number; storageEpoch: number; storedCount: number; maxEvents: number; storageError: string; query: (options: LogQuery) => Promise<LogView>; now: number; state: string; dropped: number; invalid: number; evicted: number; gaps: number; requestId: string; connections: Connection[] }>()
 const emit = defineEmits<{ request: [id: string]; retry: [] }>()
 const windowMs = ref(300_000)
+const level = ref('')
 const frozen = ref<number | null>(null)
 const selectedId = ref<string | null | undefined>(props.requestId || undefined)
 const requestPage = ref(1)
@@ -21,8 +22,8 @@ let dirty = false
 let alive = true
 onBeforeUnmount(() => { alive = false })
 const end = computed(() => frozen.value ?? props.now)
-const options = (): LogQuery => ({ end: end.value, windowMs: windowMs.value, requestId: props.requestId.trim(), selectedId: selectedId.value, page: requestPage.value, limit: 100, offset: eventOffset.value })
-const controls = () => JSON.stringify([props.storageEpoch, windowMs.value, props.requestId, selectedId.value === undefined ? ['auto'] : ['explicit', selectedId.value], requestPage.value, eventOffset.value, frozen.value])
+const options = (): LogQuery => ({ end: end.value, windowMs: windowMs.value, level: level.value, requestId: props.requestId.trim(), selectedId: selectedId.value, page: requestPage.value, limit: 100, offset: eventOffset.value })
+const controls = () => JSON.stringify([props.storageEpoch, windowMs.value, level.value, props.requestId, selectedId.value === undefined ? ['auto'] : ['explicit', selectedId.value], requestPage.value, eventOffset.value, frozen.value])
 async function load() {
   dirty = true
   if (running) return
@@ -46,7 +47,7 @@ async function load() {
   } finally { running = false }
 }
 watch(() => props.requestId, id => { selectedId.value = id || undefined; requestPage.value = 1; eventOffset.value = 0 })
-watch(windowMs, () => { requestPage.value = 1; eventOffset.value = 0 })
+watch([windowMs, level], () => { requestPage.value = 1; eventOffset.value = 0 })
 watch(() => props.storageEpoch, () => { frozen.value = null; view.value = emptyLogView(); loading.value = true })
 watch(controls, () => { void load() }, { immediate: true })
 watch(() => props.revision, () => { if (frozen.value === null) void load() })
@@ -78,6 +79,7 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
     <div class="log-filters">
       <label>Request ID<input :value="requestId" placeholder="All requests" @input="emit('request', ($event.target as HTMLInputElement).value)"/></label>
       <label>Time window<select v-model="windowMs"><option :value="60_000">Last minute</option><option :value="300_000">Last 5 minutes</option><option :value="900_000">Last 15 minutes</option><option :value="1_800_000">Last 30 minutes</option></select></label>
+      <label>Log level<select v-model="level"><option value="">All levels</option><option v-for="value in ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE']" :key="value" :value="value">{{ value === 'ERROR' ? value : `${value} and above` }}</option></select></label>
       <button v-if="requestId" class="text-button" @click="emit('request', '')">Clear filter</button>
       <span v-if="frozen" class="log-frozen">View frozen at {{ time(end) }}. Capture and retention continue.</span>
     </div>
@@ -125,9 +127,9 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
         </ol>
         <div v-if="selected.count > 100" class="log-pagination"><button class="button small" :disabled="eventOffset === 0" @click="eventOffset = Math.max(0, eventOffset - 100)">Previous events</button><span>{{ eventOffset + 1 }}–{{ Math.min(eventOffset + 100, selected.count) }} of {{ selected.count }}</span><button class="button small" :disabled="eventOffset + 100 >= selected.count" @click="eventOffset += 100">Next events</button></div>
       </div>
-      <div v-else-if="selectedId !== undefined" class="empty-state log-timeline"><h3>{{ selectedId === null ? 'Unscoped events are no longer in this window' : `Request ${selectedId} is no longer in this window` }}</h3><p>Choose a wider time window or another request. Older events may have expired or been removed at the storage limit.</p><button class="button" @click="selectedId = undefined; eventOffset = 0">Show newest request</button></div>
+      <div v-else-if="selectedId !== undefined" class="empty-state log-timeline"><h3>{{ level ? (selectedId === null ? `No unscoped events at ${level} or above in this window` : `Request ${selectedId} has no events at ${level} or above in this window`) : selectedId === null ? 'Unscoped events are no longer in this window' : `Request ${selectedId} is no longer in this window` }}</h3><p>Choose another log level, a wider time window, or another request. Older events may have expired or been removed at the storage limit.</p><button class="button" @click="selectedId = undefined; eventOffset = 0">Show newest request</button></div>
     </div>
-    <div v-else class="empty-state"><h3>{{ loading ? 'Loading captured events' : requestId ? `No captured events for request ${requestId}` : 'Waiting for request events' }}</h3><p>{{ requestId ? 'Try a wider time window or clear the request filter. Events from before capture began are unavailable.' : 'New events appear here when the backend emits them. Capture continues as you browse other panels.' }}</p></div>
+    <div v-else class="empty-state"><h3>{{ loading ? 'Loading captured events' : level ? `No events at ${level} or above in this window` : requestId ? `No captured events for request ${requestId}` : 'Waiting for request events' }}</h3><p>{{ level ? 'Try another log level, a wider time window, or clear the request filter.' : requestId ? 'Try a wider time window or clear the request filter. Events from before capture began are unavailable.' : 'New events appear here when the backend emits them. Capture continues as you browse other panels.' }}</p></div>
   </section>
 </template>
 

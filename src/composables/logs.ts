@@ -1,5 +1,5 @@
 import { onBeforeUnmount, ref, watch, type Ref } from 'vue'
-import { LOG_CAPACITY, logSocketUrl, parseLog, pruneLogs, type LogEvent } from '../lib/logs'
+import { LOG_CAPACITY, logLevelMatches, logSocketUrl, parseLog, pruneLogs, type LogEvent } from '../lib/logs'
 import { normalizeBase } from '../lib/api'
 import { LogStorageClient } from '../lib/log-client'
 import { DEFAULT_LOG_LIMIT, validLogLimit, logOverview, summarizeLogs, type LogQuery, type LogView } from '../lib/log-storage'
@@ -135,7 +135,7 @@ export function useLogs(backend: Ref<Backend>, demo: Ref<boolean>, paused: Ref<b
     if (currentClient) return currentClient.query(scope, options)
     const rows = memory.filter(event => event.receivedAt <= options.end && event.receivedAt >= options.end - 30 * 60_000)
     const view = summarizeLogs(rows.map(event => logOverview(event, scope)), options)
-    if (view.selected) view.events = rows.filter(event => event.requestId === view.selected!.id && event.receivedAt >= options.end - options.windowMs)
+    if (view.selected) view.events = rows.filter(event => event.requestId === view.selected!.id && event.receivedAt >= options.end - options.windowMs && logLevelMatches(event.level, options.level))
       .sort((a, b) => a.at - b.at || a.sequence - b.sequence).slice(options.offset ?? 0, (options.offset ?? 0) + options.limit)
     return view
   }

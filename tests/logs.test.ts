@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { logSocketUrl, logFields, requestMetadata, parseLog, pruneLogs, logsInWindow, LOG_RETENTION_MS, type LogEvent } from '../src/lib/logs.ts'
+import { logSocketUrl, logLevelMatches, logFields, requestMetadata, parseLog, pruneLogs, logsInWindow, LOG_RETENTION_MS, type LogEvent } from '../src/lib/logs.ts'
 
 const record = { timestamp: '2026-11-07T12:00:00.123Z', level: 'TRACE', target: 'shadowquic::test', event: 'stream:accepted', fields: { message: 'accepted' }, spans: [{ name: 'request', fields: { req_id: 42 } }] }
 function parse(value: unknown, receivedAt = 1000, sequence = 1) { return parseLog(JSON.stringify(value), receivedAt, sequence) as LogEvent }
@@ -62,4 +62,15 @@ test('inline log fields omit the message and preserve tracing-rendered values an
     ['dst', 'example.com:443'], ['elapsed_ms', '0'], ['reused', 'false'], ['error', 'null'], ['empty', '""'], ['debug', 'Some("value")'], ['detail', '{"retries":2}'],
   ])
   assert.deepEqual(logFields({ message: 'nothing extra' }), [])
+})
+
+test('log level thresholds include all higher severities and normalize case', () => {
+  const levels = ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR']
+  for (let minimum = 0; minimum < levels.length; minimum++) {
+    assert.deepEqual(levels.filter(level => logLevelMatches(level, levels[minimum])), levels.slice(minimum))
+  }
+  assert.equal(logLevelMatches('warn', 'info'), true)
+  assert.equal(logLevelMatches('debug', 'INFO'), false)
+  assert.equal(logLevelMatches('CUSTOM', ''), true)
+  assert.equal(logLevelMatches('CUSTOM', 'INFO'), false)
 })

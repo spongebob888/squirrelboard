@@ -41,3 +41,7 @@ The request list scrolls independently within 70vh on desktop and 250px on mobil
 Show a compact stored-event count and 30-minute retention summary. Keep storage limits, timing semantics, and request ID matching in the adjacent info tooltip. Reveal it on hover, keyboard focus, or touch focus; allow Escape dismissal and pointer travel into the tip. Keep the 320px tooltip inside the mobile viewport.
 
 Capture completeness shares this summary: show an amber warning icon and “Capture incomplete” beside retention whenever drop, interruption, eviction, or unreadable-record counts are nonzero. Put all four counts in the same hover/focus tooltip above storage and timing help. Keep connection and storage failures as separate actionable messages.
+
+## Log level filter
+
+Place a native Log level select immediately after Time window. Default to All levels, with minimum ERROR, WARN, INFO, DEBUG, and TRACE choices. Include events at the selected level and above (INFO includes INFO, WARN, and ERROR); label thresholds explicitly. Filter summaries, counts, markers, and event pages consistently in IndexedDB and memory, while retaining request metadata from other levels. Reset pagination when filters change; preserve explicit request selection and explain no matches. Capture and storage keep all levels.

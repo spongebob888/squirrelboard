@@ -15,6 +15,14 @@ export interface LogEvent {
   spans: { name: string; fields: Record<string, unknown> }[]
   requestId: string | null
 }
+const LOG_LEVEL_RANK: Record<string, number> = { TRACE: 0, DEBUG: 1, INFO: 2, WARN: 3, ERROR: 4 }
+export function logLevelMatches(level: string, minimum?: string): boolean {
+  if (!minimum) return true
+  const rank = LOG_LEVEL_RANK[level.toUpperCase()]
+  const threshold = LOG_LEVEL_RANK[minimum.toUpperCase()]
+  return rank !== undefined && threshold !== undefined && rank >= threshold
+}
+
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
 const requestId = (value: unknown): string | null => typeof value === 'string' && value.length > 0 ? value : typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? String(value) : null
 

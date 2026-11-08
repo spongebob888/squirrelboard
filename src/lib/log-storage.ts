@@ -1,4 +1,4 @@
-import { LOG_RETENTION_MS, logCategory, requestMetadata, type LogCategory, type LogEvent, type RequestMetadata } from './logs'
+import { LOG_RETENTION_MS, logCategory, logLevelMatches, requestMetadata, type LogCategory, type LogEvent, type RequestMetadata } from './logs'
 
 export const DEFAULT_LOG_LIMIT = 100_000
 export const MAX_LOG_LIMIT = 1_000_000
@@ -6,16 +6,16 @@ export function validLogLimit(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1000 && value <= MAX_LOG_LIMIT
 }
 export interface LogQuery {
-  end: number; windowMs: number; requestId: string; selectedId?: string | null; page: number; limit: number; offset?: number
+  end: number; windowMs: number; requestId: string; selectedId?: string | null; level?: string; page: number; limit: number; offset?: number
 }
 interface Overview {
-  sequence: number; scope: string; receivedAt: number; at: number; requestId: string | null; event: string | null; metadata: RequestMetadata; destinationPriority?: number
+  sequence: number; scope: string; receivedAt: number; at: number; requestId: string | null; level: string; event: string | null; metadata: RequestMetadata; destinationPriority?: number
 }
 export function logOverview(event: LogEvent, scope: string, sequence = event.sequence): Overview {
   const metadata = requestMetadata([event], event.requestId)
   const routed = event.event === 'routing:outbound_selected' && typeof event.fields.dst === 'string' && event.fields.dst.trim()
   const request = event.spans.some(span => ['tcp_req', 'udp_req'].includes(span.name) && String(span.fields.req_id) === event.requestId && typeof span.fields.dst === 'string' && span.fields.dst.trim())
-  return { sequence, scope, receivedAt: event.receivedAt, at: event.at, requestId: event.requestId, event: event.event, metadata, destinationPriority: routed ? 3 : request ? 2 : 1 }
+  return { sequence, scope, receivedAt: event.receivedAt, at: event.at, requestId: event.requestId, level: event.level.toUpperCase(), event: event.event, metadata, destinationPriority: routed ? 3 : request ? 2 : 1 }
 }
 export interface RequestSummary {
   id: string | null; count: number; first: { at: number }; last: { at: number; receivedAt: number }
@@ -40,14 +40,24 @@ const complete = (transaction: IDBTransaction) => new Promise<void>((resolve, re
 export class LogDatabase {
   private db: IDBDatabase | null = null
   async open() {
-    const request = indexedDB.open('squirrelboard.logs', 2)
-    request.onupgradeneeded = () => {
+    const request = indexedDB.open('squirrelboard.logs', 3)
+    request.onupgradeneeded = event => {
       const db = request.result
       if (!db.objectStoreNames.contains('events')) db.createObjectStore('events', { keyPath: 'sequence', autoIncrement: true })
       const overview = db.objectStoreNames.contains('overview') ? request.transaction!.objectStore('overview') : db.createObjectStore('overview', { keyPath: 'sequence' })
       if (!overview.indexNames.contains('scopeTime')) overview.createIndex('scopeTime', ['scope', 'receivedAt'])
       if (!overview.indexNames.contains('receivedAt')) overview.createIndex('receivedAt', 'receivedAt')
       if (!overview.indexNames.contains('requestTime')) overview.createIndex('requestTime', ['scope', 'requestId', 'receivedAt'])
+      if (event.oldVersion > 0 && event.oldVersion < 3) {
+        // Add levels to existing summaries without discarding retained events.
+        const cursor = request.transaction!.objectStore('events').openCursor()
+        cursor.onsuccess = () => {
+          const row = cursor.result
+          if (!row) return
+          overview.put(logOverview(row.value, row.value.scope))
+          row.continue()
+        }
+      }
     }
     this.db = await new Promise<IDBDatabase>((resolve, reject) => {
       let failed = false
@@ -110,7 +120,7 @@ export class LogDatabase {
     const range = IDBKeyRange.bound([...key, Math.max(0, query.end - LOG_RETENTION_MS)], [...key, query.end])
     const rows = await result<Overview[]>(tx.objectStore('overview').index(query.requestId ? 'requestTime' : 'scopeTime').getAll(range))
     const view = summarizeLogs(rows, query)
-    const ids = view.selected ? rows.filter(row => row.requestId === view.selected!.id && row.receivedAt >= query.end - query.windowMs)
+    const ids = view.selected ? rows.filter(row => row.requestId === view.selected!.id && row.receivedAt >= query.end - query.windowMs && logLevelMatches(row.level, query.level))
       .sort((a, b) => a.at - b.at || a.sequence - b.sequence).slice(query.offset ?? 0, (query.offset ?? 0) + query.limit).map(row => row.sequence) : []
     // Queue all reads in the same transaction so eviction cannot tear the result.
     const events = await Promise.all(ids.map(id => result(tx.objectStore('events').get(id))))
@@ -138,7 +148,7 @@ export function summarizeLogs(rows: Overview[], query: LogQuery): LogView {
       context[key] = row.metadata[key]
     }
     metadata.set(row.requestId, context)
-    if (row.receivedAt < query.end - query.windowMs) continue
+    if (row.receivedAt < query.end - query.windowMs || !logLevelMatches(row.level, query.level)) continue
     totalEvents++
     let group = groups.get(row.requestId)
     if (!group) {
