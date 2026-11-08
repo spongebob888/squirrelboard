@@ -10,6 +10,18 @@ const props = defineProps<{ revision: number; storageEpoch: number; storedCount:
 const emit = defineEmits<{ request: [id: string]; retry: []; view: [mode: string] }>()
 const windowMs = ref(300_000)
 const level = ref('')
+const eventSearchDraft = ref('')
+const eventSearch = ref('')
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+function applyEventSearch() {
+  clearTimeout(searchTimer)
+  eventSearch.value = eventSearchDraft.value.trim().toLowerCase()
+}
+watch(eventSearchDraft, value => {
+  clearTimeout(searchTimer)
+  if (!value.trim()) applyEventSearch()
+  else searchTimer = setTimeout(applyEventSearch, 250)
+})
 const waterfallLimit = ref(DEFAULT_WATERFALL_LIMIT)
 try {
   const saved = Number(localStorage.getItem('squirrelboard.waterfallLimit'))
@@ -41,10 +53,10 @@ const hasCaptureIssues = computed(() => !!(props.dropped || props.gaps || props.
 let running = false
 let dirty = false
 let alive = true
-onBeforeUnmount(() => { alive = false })
+onBeforeUnmount(() => { alive = false; clearTimeout(searchTimer) })
 const end = computed(() => frozen.value ?? props.now)
-const options = (): LogQuery => ({ end: end.value, windowMs: windowMs.value, level: level.value, requestId: props.requestId.trim(), selectedId: selectedId.value, page: requestPage.value, mode: isWaterfall.value ? 'waterfall' : undefined, limit: isWaterfall.value ? waterfallLimit.value : 100, offset: eventOffset.value })
-const controls = () => JSON.stringify([props.storageEpoch, props.viewMode, waterfallLimit.value, windowMs.value, level.value, props.requestId, selectedId.value === undefined ? ['auto'] : ['explicit', selectedId.value], requestPage.value, eventOffset.value, frozen.value])
+const options = (): LogQuery => ({ end: end.value, windowMs: windowMs.value, level: level.value, search: eventSearch.value, requestId: props.requestId.trim(), selectedId: selectedId.value, page: requestPage.value, mode: isWaterfall.value ? 'waterfall' : undefined, limit: isWaterfall.value ? waterfallLimit.value : 100, offset: eventOffset.value })
+const controls = () => JSON.stringify([props.storageEpoch, props.viewMode, waterfallLimit.value, windowMs.value, level.value, eventSearch.value, props.requestId, selectedId.value === undefined ? ['auto'] : ['explicit', selectedId.value], requestPage.value, eventOffset.value, frozen.value])
 async function load() {
   dirty = true
   if (running) return
@@ -69,7 +81,7 @@ async function load() {
   } finally { running = false }
 }
 watch(() => props.requestId, id => { selectedId.value = id || undefined; requestPage.value = 1; eventOffset.value = 0 })
-watch([windowMs, level, waterfallLimit, () => props.requestId, () => props.viewMode], () => { requestPage.value = 1; eventOffset.value = 0; eventSequence.value = undefined })
+watch([windowMs, level, eventSearch, waterfallLimit, () => props.requestId, () => props.viewMode], () => { requestPage.value = 1; eventOffset.value = 0; eventSequence.value = undefined })
 watch(eventOffset, () => { eventSequence.value = undefined })
 watch(() => props.storageEpoch, () => { frozen.value = null; view.value = emptyLogView(); loading.value = true })
 watch(controls, () => { void load() }, { immediate: true })
@@ -101,10 +113,11 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
       <div class="log-actions"><button class="button" :aria-pressed="!!frozen" @click="freeze">{{ frozen ? 'Follow live' : 'Freeze view' }}</button><button v-if="state.includes('Unavailable')" class="button" @click="emit('retry')">Retry stream</button></div>
     </div>
     <div class="log-filters">
-      <label>Request ID<input v-memo="[requestId]" :value="requestId" placeholder="All requests" @input="emit('request', ($event.target as HTMLInputElement).value)"/></label>
-      <label v-memo="[windowMs]">Time window<select v-model="windowMs"><option :value="60_000">Last minute</option><option :value="300_000">Last 5 minutes</option><option :value="900_000">Last 15 minutes</option><option :value="1_800_000">Last 30 minutes</option></select></label>
-      <label v-memo="[level]">Log level<select v-model="level"><option value="">All levels</option><option v-for="value in ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE']" :key="value" :value="value">{{ value === 'ERROR' ? value : `${value} and above` }}</option></select></label>
-      <label v-if="isWaterfall">Events per page<input v-memo="[waterfallLimit]" type="number" :value="waterfallLimit" min="1" :max="MAX_WATERFALL_LIMIT" step="1" title="1 to 10,000 events" @change="setWaterfallLimit" @keydown.enter.prevent="setWaterfallLimit"/></label>
+      <label class="filter-request">Request ID<input v-memo="[requestId]" :value="requestId" placeholder="All requests" @input="emit('request', ($event.target as HTMLInputElement).value)"/></label>
+      <label class="filter-search">Search events<input v-memo="[eventSearchDraft]" v-model="eventSearchDraft" type="search" placeholder="Search whole event" @keydown.enter="applyEventSearch"/></label>
+      <label class="filter-window" v-memo="[windowMs]">Time window<select v-model="windowMs"><option :value="60_000">Last minute</option><option :value="300_000">Last 5 minutes</option><option :value="900_000">Last 15 minutes</option><option :value="1_800_000">Last 30 minutes</option></select></label>
+      <label class="filter-level" v-memo="[level]">Log level<select v-model="level"><option value="">All levels</option><option v-for="value in ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE']" :key="value" :value="value">{{ value === 'ERROR' ? value : `${value} and above` }}</option></select></label>
+      <label class="filter-limit" v-if="isWaterfall">Events per page<input v-memo="[waterfallLimit]" type="number" :value="waterfallLimit" min="1" :max="MAX_WATERFALL_LIMIT" step="1" title="1 to 10,000 events" @change="setWaterfallLimit" @keydown.enter.prevent="setWaterfallLimit"/></label>
       <button v-if="requestId" class="text-button" @click="emit('request', '')">Clear filter</button>
       <span v-if="frozen" class="log-frozen">View frozen at {{ time(end) }}. Capture and retention continue.</span>
     </div>
@@ -153,9 +166,9 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
         </ol>
         <div v-if="selected.count > 100" class="log-pagination"><button class="button small" :disabled="eventOffset === 0" @click="eventOffset = Math.max(0, eventOffset - 100)">Previous events</button><span>{{ eventOffset + 1 }}–{{ Math.min(eventOffset + 100, selected.count) }} of {{ selected.count }}</span><button class="button small" :disabled="eventOffset + 100 >= selected.count" @click="eventOffset += 100">Next events</button></div>
       </div>
-      <div v-else-if="selectedId !== undefined" class="empty-state log-timeline"><h3>{{ level ? (selectedId === null ? `No unscoped events at ${level} or above in this window` : `Request ${selectedId} has no events at ${level} or above in this window`) : selectedId === null ? 'Unscoped events are no longer in this window' : `Request ${selectedId} is no longer in this window` }}</h3><p>Choose another log level, a wider time window, or another request. Older events may have expired or been removed at the storage limit.</p><button class="button" @click="selectedId = undefined; eventOffset = 0">Show newest request</button></div>
+      <div v-else-if="selectedId !== undefined" class="empty-state log-timeline"><h3>{{ eventSearch ? (selectedId === null ? 'No unscoped events match this search' : `Request ${selectedId} has no events matching this search`) : level ? (selectedId === null ? `No unscoped events at ${level} or above in this window` : `Request ${selectedId} has no events at ${level} or above in this window`) : selectedId === null ? 'Unscoped events are no longer in this window' : `Request ${selectedId} is no longer in this window` }}</h3><p>{{ eventSearch ? 'Change the search, adjust the other filters, or choose another request.' : 'Choose another log level, a wider time window, or another request. Older events may have expired or been removed at the storage limit.' }}</p><button class="button" @click="selectedId = undefined; eventOffset = 0">Show newest request</button></div>
     </div>
-    <div v-else class="empty-state"><h3>{{ loading ? 'Loading captured events' : level ? `No events at ${level} or above in this window` : requestId ? `No captured events for request ${requestId}` : 'Waiting for request events' }}</h3><p>{{ level ? 'Try another log level, a wider time window, or clear the request filter.' : requestId ? 'Try a wider time window or clear the request filter. Events from before capture began are unavailable.' : 'New events appear here when the backend emits them. Capture continues as you browse other panels.' }}</p></div>
+    <div v-else class="empty-state"><h3>{{ loading ? 'Loading captured events' : eventSearch ? 'No events match this search' : level ? `No events at ${level} or above in this window` : requestId ? `No captured events for request ${requestId}` : 'Waiting for request events' }}</h3><p>{{ eventSearch ? 'Try different text, clear Search events, or adjust the other filters.' : level ? 'Try another log level, a wider time window, or clear the request filter.' : requestId ? 'Try a wider time window or clear the request filter. Events from before capture began are unavailable.' : 'New events appear here when the backend emits them. Capture continues as you browse other panels.' }}</p></div>
   </section>
 </template>
 
@@ -177,11 +190,19 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
 .log-legend li { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--secondary); }
 .log-legend i { width: 6px; height: 6px; border-radius: 50%; background: color-mix(in srgb, var(--event-color) 60%, var(--text)); }
 .log-heading, .log-actions, .log-filters, .log-pagination { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-.log-filters { padding: 0 21px 14px; }
+.log-filters { padding: 0 21px 14px; gap: 10px; align-items: end; }
 .log-filters label { display: grid; gap: 6px; color: var(--secondary); font-size: 12px; }
 .log-filters input { padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); font-size: 12px; }
 .log-filters input::placeholder { color: var(--secondary); }
 .log-filters input, .log-filters select { min-height: 38px; width: 210px; max-width: 100%; }
+.log-filters .filter-request input { width: 160px; }
+.log-filters .filter-search { flex: 1 1 220px; max-width: 380px; }
+.log-filters .filter-search input { width: 100%; min-width: min(100%, 260px); }
+.log-filters .filter-window select { width: 138px; }
+.log-filters .filter-level select { width: 142px; }
+.log-filters .filter-limit input { width: 100px; }
+.log-filters .text-button { align-self: end; min-height: 38px; }
+.log-filters .log-frozen { flex-basis: 100%; }
 .log-note { margin: 0; padding: 0 21px 16px; font-size: 12px; color: var(--secondary); line-height: 1.6; }
 
 .log-help-summary { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding-bottom: 12px; }
@@ -250,6 +271,9 @@ function freeze() { frozen.value = frozen.value === null ? props.now : null }
   .log-filters { padding-inline: 15px; }
   .log-filters label { flex: 1 1 120px; min-width: 0; }
   .log-filters input, .log-filters select { width: 100%; }
+  .log-filters .filter-request, .log-filters .filter-search { flex: 1 1 120px; min-width: 0; max-width: none; }
+  .log-filters .filter-request input, .log-filters .filter-search input { width: 100%; min-width: 0; }
+  .log-filters .filter-window, .log-filters .filter-level, .log-filters .filter-limit { flex: 0 1 auto; }
   .log-note { padding-inline: 15px; }
   .log-timeline { padding: 16px 12px; }
   .timeline-note { padding-inline: 0; }

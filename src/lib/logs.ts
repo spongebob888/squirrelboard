@@ -119,3 +119,9 @@ export function logFields(fields: Record<string, unknown>): [string, string][] {
     key, typeof value === 'string' ? (value === '' ? '\"\"' : value) : JSON.stringify(value) ?? String(value),
   ])
 }
+
+/** Search the retained event, including tracing-style field pairs and span context. */
+export function logSearchText(event: LogEvent): string {
+  const fields = (values: Record<string, unknown>) => Object.entries(values).map(([key, value]) => `${key}=${typeof value === 'string' ? (value === '' ? '\"\"' : value) : JSON.stringify(value) ?? String(value)}`).join('\n')
+  return [event.timestamp, event.level, event.target, event.event ?? '', `req_id=${event.requestId ?? 'unscoped'}`, LOG_CATEGORIES[logCategory(event.event)], fields(event.fields), ...event.spans.map(span => `${span.name}\n${fields(span.fields)}`)].join('\n').toLowerCase()
+}
