@@ -12,7 +12,7 @@ for (const storage of ['IndexedDB', 'memory']) {
     const events = ['proxy:accepted', 'routing:outbound_selected', 'dns:resolved', 'sniffer:protocol', 'security:checked', 'stream:closed', 'custom:event']
     const levels = ['INFO', 'DEBUG', 'WARN', 'ERROR', 'TRACE', 'INFO', 'INFO']
     const at = Date.now() - 5000
-    const record = (index: number) => JSON.stringify({ timestamp: new Date(at + index * 500).toISOString(), level: levels[index % 7], target: 'shadowquic::test', event: events[index % 7], fields: { ...(index === 6 ? {} : { req_id: 42 + index }), message: `Waterfall event ${index}`, dst: 'waterfall.example:443', ...(index === 0 ? { empty: '', attempt: 0, cached: false, context: { route: 'direct' } } : {}) }, spans: [] })
+    const record = (index: number) => JSON.stringify({ timestamp: new Date(at + index * 500).toISOString(), level: levels[index % 7], target: 'shadowquic::test', event: events[index % 7], fields: { ...(index === 6 ? {} : { req_id: 42 + index }), message: `Waterfall event ${index}`, dst: 'waterfall.example:443', ...(index === 0 ? { empty: '', attempt: 0, cached: false, context: { route: 'direct' } } : {}) }, spans: index === 6 ? [] : [{ name: 'inbound', fields: { tag: 'mixed-in' } }, { name: 'tcp_req', fields: { req_id: 42 + index, cached: false, attempt: 0, empty: '', message: 'span context' } }, { name: 'connect', fields: {} }] })
     for (let index = 0; index < 7; index++) send(record(index))
     await page.getByRole('navigation', { name: 'Log views' }).getByRole('link', { name: 'Waterfall', exact: true }).click()
     await expect(page).toHaveURL(/view=waterfall/)
@@ -21,8 +21,12 @@ for (const storage of ['IndexedDB', 'memory']) {
     await expect(page.locator('.waterfall-event-list li')).toHaveCount(7)
     await expect(page.locator('.waterfall-list-message').first()).toContainText('Waterfall event 0 req_id=42 dst=waterfall.example:443')
     await expect(page.locator('.waterfall-list-message').first()).toContainText('empty="" attempt=0 cached=false context={"route":"direct"}')
-    await expect(page.locator('.waterfall-list-message').first()).not.toContainText('message=')
+    await expect(page.locator('.waterfall-list-message').first()).not.toContainText('message=Waterfall event')
     const firstRow = page.locator('.waterfall-event-button').first()
+    const spanPrefix = 'inbound{tag=mixed-in}:tcp_req{req_id=42 cached=false attempt=0 empty="" message=span context}:connect:'
+    await expect(firstRow.locator('.waterfall-list-message')).toContainText(spanPrefix + ' Waterfall event 0')
+    await expect(firstRow.locator('.waterfall-list-main')).toHaveAttribute('title', new RegExp('^inbound\\{tag=mixed-in\\}:tcp_req'))
+    await expect(page.locator('.waterfall-list-message').last()).toHaveText('Waterfall event 6 dst=waterfall.example:443')
     await expect(firstRow.locator('.waterfall-time small')).toHaveText('Request 42')
     await expect(firstRow.locator('.waterfall-list-main small')).toHaveCount(0)
     await expect(firstRow.locator('.waterfall-list-main')).not.toContainText('shadowquic::test')
@@ -48,21 +52,22 @@ for (const storage of ['IndexedDB', 'memory']) {
     await expect(detail.getByRole('button', { name: /View request/ })).toHaveCount(0)
     await first.click()
     await expect(detail).toContainText('Waterfall event 0')
+    await expect(detail.locator('.waterfall-message')).toContainText(spanPrefix + ' Waterfall event 0')
     if (storage === 'IndexedDB') {
       await page.getByRole('button', { name: /dns:resolved · Request 44/ }).click()
       await expect(detail.locator('.waterfall-level')).toHaveCSS('color', 'rgb(195, 145, 69)')
       await page.getByRole('button', { name: /sniffer:protocol · Request 45/ }).click()
       await expect(detail.locator('.waterfall-level')).toHaveCSS('color', 'rgb(212, 92, 101)')
-      await page.screenshot({ path: '.impeccable/review/log-waterfall-desktop.png', fullPage: true, animations: 'disabled' })
+      await page.screenshot({ path: '.impeccable/review/log-waterfall-spans-desktop.png', fullPage: true, animations: 'disabled' })
       await page.evaluate(() => document.documentElement.dataset.theme = 'dark')
       await expect(detail.locator('.waterfall-level')).toHaveCSS('color', 'rgb(237, 148, 154)')
-      await page.screenshot({ path: '.impeccable/review/log-waterfall-dark.png', fullPage: true, animations: 'disabled' })
+      await page.screenshot({ path: '.impeccable/review/log-waterfall-spans-dark.png', fullPage: true, animations: 'disabled' })
       await page.setViewportSize({ width: 390, height: 1000 })
       expect((await firstRow.boundingBox())!.height).toBeLessThanOrEqual(52)
       await expect(firstRow.locator('.waterfall-list-main')).toHaveAttribute('title', /attempt=0 cached=false/)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
       expect(await page.locator('.waterfall-scroll').evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true)
-      await page.screenshot({ path: '.impeccable/review/log-waterfall-mobile.png', fullPage: true, animations: 'disabled' })
+      await page.screenshot({ path: '.impeccable/review/log-waterfall-spans-mobile.png', fullPage: true, animations: 'disabled' })
       await page.setViewportSize({ width: 1440, height: 1000 })
     }
     const eventLimit = page.getByRole('spinbutton', { name: 'Events per page', exact: true })
@@ -112,7 +117,8 @@ test('waterfall pages matching points and loads only their event bodies', async 
     const path = '/src/lib/log-storage.ts'
     const { LogDatabase } = await import(path)
     const db = new LogDatabase(); await db.open()
-    const now = Date.now()
+    // Keep seeded arrivals behind the UI clock when Freeze view uses its last tick.
+    const now = Date.now() - 2000
     const events = Array.from({ length: 1001 }, (_, index) => ({ sequence: 0, receivedAt: now - 1000 + index, at: now - 1000 + index, timestamp: new Date(now - 1000 + index).toISOString(), level: ['TRACE', 'INFO', 'ERROR'][index % 3], target: 'test', event: index % 2 ? 'dns:resolved' : 'proxy:accepted', fields: { message: `Point ${index}` }, spans: [], requestId: String(index % 31) }))
     await db.append(location.origin, events, 5000, now)
     const options = { mode: 'waterfall', end: now, windowMs: 60_000, requestId: '', page: 1, limit: 500 }

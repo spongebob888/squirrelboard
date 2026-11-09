@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { logSocketUrl, logSearchText, logLevelMatches, logFields, requestMetadata, parseLog, pruneLogs, logsInWindow, LOG_RETENTION_MS, type LogEvent } from '../src/lib/logs.ts'
+import { logSocketUrl, logSearchText, logSpans, logLevelMatches, logFields, requestMetadata, parseLog, pruneLogs, logsInWindow, LOG_RETENTION_MS, type LogEvent } from '../src/lib/logs.ts'
 
 const record = { timestamp: '2026-11-07T12:00:00.123Z', level: 'TRACE', target: 'shadowquic::test', event: 'stream:accepted', fields: { message: 'accepted' }, spans: [{ name: 'request', fields: { req_id: 42 } }] }
 function parse(value: unknown, receivedAt = 1000, sequence = 1) { return parseLog(JSON.stringify(value), receivedAt, sequence) as LogEvent }
@@ -79,4 +79,13 @@ test('whole event search includes tracing values, metadata and span context', ()
   const text = logSearchText(parse({ ...record, fields: { message: 'Connected upstream', attempt: 0, cached: false, empty: '', context: { answer: 'NestedValue' } }, spans: [{ name: 'tcp_req', fields: { req_id: 42, dst: 'Private.Example:443' } }] }))
   for (const needle of ['connected upstream', 'attempt=0', 'cached=false', 'empty=""', 'context={"answer":"nestedvalue"}', 'tcp_req', 'dst=private.example:443', 'req_id=42', 'shadowquic::test', 'stream:accepted', 'trace', record.timestamp.toLowerCase()]) assert.ok(text.includes(needle), needle)
   assert.ok(!text.includes('missing text'))
+})
+
+test('tracing span context preserves nesting and all field values, including message fields', () => {
+  assert.equal(logSpans([]), '')
+  assert.equal(logSpans([
+    { name: 'inbound', fields: { tag: 'mixed' } },
+    { name: 'tcp_req', fields: { req_id: 42, attempt: 0, cached: false, empty: '', context: { route: 'direct' }, message: 'span message' } },
+    { name: 'connect', fields: {} },
+  ]), 'inbound{tag=mixed}:tcp_req{req_id=42 attempt=0 cached=false empty="" context={"route":"direct"} message=span message}:connect:')
 })

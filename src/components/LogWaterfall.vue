@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { LOG_CATEGORIES, logCategory, logFields, type LogEvent } from '../lib/logs'
+import { LOG_CATEGORIES, logCategory, logFields, logSpans, type LogEvent } from '../lib/logs'
 import type { WaterfallPoint, WaterfallView } from '../lib/log-storage'
 
 const props = defineProps<{ data: WaterfallView; selectedSequence?: number; events: LogEvent[] }>()
@@ -19,11 +19,13 @@ const eventsBySequence = computed(() => new Map(props.events.map(event => [event
 const entries = computed(() => props.data.points.map(point => {
   const log = eventsBySequence.value.get(point.sequence)
   const inlineFields = log ? logFields(log.fields) : []
+  const spanContext = log ? logSpans(log.spans) : ''
   const message = log?.fields.message
-  return { point, log, inlineFields, preview: [typeof message === 'string' ? message : JSON.stringify(message) ?? '', ...inlineFields.map(([name, value]) => `${name}=${value}`)].join(' ').trim() }
+  return { point, log, inlineFields, spanContext, preview: [spanContext, typeof message === 'string' ? message : JSON.stringify(message) ?? '', ...inlineFields.map(([name, value]) => `${name}=${value}`)].join(' ').trim() }
 }))
 const detail = computed(() => props.selectedSequence === undefined ? undefined : eventsBySequence.value.get(props.selectedSequence))
 const fields = computed(() => detail.value ? logFields(detail.value.fields) : [])
+const spanContext = computed(() => detail.value ? logSpans(detail.value.spans) : '')
 function revealListSelection(sequence: number) {
   const list = eventList.value
   const row = list?.querySelector<HTMLButtonElement>(`[data-list-sequence="${sequence}"]`)
@@ -76,7 +78,7 @@ async function key(event: KeyboardEvent, point: WaterfallPoint, source: 'dot' | 
       <li v-for="entry in entries" :key="entry.point.sequence">
         <button class="waterfall-event-button" :class="[`category-${logCategory(entry.point.event)}`, { selected: selectedSequence === entry.point.sequence }]" :data-list-sequence="entry.point.sequence" :tabindex="tabSequence === entry.point.sequence ? 0 : -1" :aria-pressed="selectedSequence === entry.point.sequence" @click="emit('select', entry.point.sequence)" @keydown="key($event, entry.point, 'list')">
           <span class="waterfall-time"><time :datetime="new Date(entry.point.at).toISOString()">{{ time(entry.point.at) }}</time><small :title="entry.point.requestId ?? 'Unscoped event'">{{ entry.point.requestId === null ? 'Unscoped' : `Request ${entry.point.requestId}` }}</small></span>
-          <span class="waterfall-list-main" :title="entry.preview"><strong><i aria-hidden="true"/>{{ entry.point.event || 'Unlabelled event' }}</strong><span class="waterfall-list-message"><span v-if="entry.log && entry.log.fields.message != null">{{ entry.log.fields.message }}</span><template v-for="[name, value] in entry.inlineFields" :key="name">{{ ' ' }}<span class="waterfall-field"><span>{{ name }}=</span>{{ value }}</span></template></span></span>
+          <span class="waterfall-list-main" :title="entry.preview"><strong><i aria-hidden="true"/>{{ entry.point.event || 'Unlabelled event' }}</strong><span class="waterfall-list-message"><span v-if="entry.spanContext" class="waterfall-field">{{ entry.spanContext }}{{ ' ' }}</span><span v-if="entry.log && entry.log.fields.message != null">{{ entry.log.fields.message }}</span><template v-for="[name, value] in entry.inlineFields" :key="name">{{ ' ' }}<span class="waterfall-field"><span>{{ name }}=</span>{{ value }}</span></template></span></span>
           <span class="waterfall-level" :class="entry.point.level.toLowerCase()">{{ entry.point.level }}</span>
         </button>
       </li>
@@ -87,7 +89,7 @@ async function key(event: KeyboardEvent, point: WaterfallPoint, source: 'dot' | 
       <template v-if="detail">
         <div class="waterfall-detail-heading" :class="`category-${logCategory(detail.event)}`"><h3>{{ detail.event || 'Unlabelled event' }}</h3><span><span class="waterfall-level" :class="detail.level.toLowerCase()">{{ detail.level }}</span> · {{ time(detail.at) }}</span></div>
         <p class="waterfall-event-context">{{ LOG_CATEGORIES[logCategory(detail.event)] }} · {{ detail.requestId === null ? 'Unscoped event' : `Request ${detail.requestId}` }} · {{ detail.target }}</p>
-        <p v-if="detail.fields.message != null || fields.length" class="waterfall-message"><span v-if="detail.fields.message != null">{{ detail.fields.message }}</span><template v-for="[name, value] in fields" :key="name">{{ ' ' }}<span class="waterfall-field"><span>{{ name }}=</span>{{ value }}</span></template></p>
+        <p v-if="spanContext || detail.fields.message != null || fields.length" class="waterfall-message"><span v-if="spanContext" class="waterfall-field">{{ spanContext }}{{ ' ' }}</span><span v-if="detail.fields.message != null">{{ detail.fields.message }}</span><template v-for="[name, value] in fields" :key="name">{{ ' ' }}<span class="waterfall-field"><span>{{ name }}=</span>{{ value }}</span></template></p>
         <details><summary>Fields &amp; spans</summary><pre>{{ JSON.stringify({ fields: detail.fields, spans: detail.spans }, null, 2) }}</pre></details>
         <button v-if="detail.requestId !== null" class="text-button" @click="emit('request', detail.requestId)">View request {{ detail.requestId }} timeline</button>
       </template>

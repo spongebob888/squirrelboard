@@ -113,15 +113,27 @@ export function logCategory(event: string | null): LogCategory {
   return Object.hasOwn(CATEGORY_PREFIXES, prefix) ? CATEGORY_PREFIXES[prefix]! : 'other'
 }
 
+function logValue(value: unknown): string {
+  return typeof value === 'string' ? (value === '' ? '""' : value) : JSON.stringify(value) ?? String(value)
+}
+
+/** Print outer-to-inner span context in tracing's full event format. */
+export function logSpans(spans: LogEvent['spans']): string {
+  return spans.map(span => {
+    const fields = Object.entries(span.fields).map(([name, value]) => `${name}=${logValue(value)}`).join(' ')
+    return `${span.name}${fields ? `{${fields}}` : ''}:`
+  }).join('')
+}
+
 /** The wire format already renders tracing Display/Debug values as strings. */
 export function logFields(fields: Record<string, unknown>): [string, string][] {
   return Object.entries(fields).filter(([key]) => key !== 'message').map(([key, value]) => [
-    key, typeof value === 'string' ? (value === '' ? '\"\"' : value) : JSON.stringify(value) ?? String(value),
+    key, logValue(value),
   ])
 }
 
 /** Search the retained event, including tracing-style field pairs and span context. */
 export function logSearchText(event: LogEvent): string {
-  const fields = (values: Record<string, unknown>) => Object.entries(values).map(([key, value]) => `${key}=${typeof value === 'string' ? (value === '' ? '\"\"' : value) : JSON.stringify(value) ?? String(value)}`).join('\n')
+  const fields = (values: Record<string, unknown>) => Object.entries(values).map(([key, value]) => `${key}=${logValue(value)}`).join('\n')
   return [event.timestamp, event.level, event.target, event.event ?? '', `req_id=${event.requestId ?? 'unscoped'}`, LOG_CATEGORIES[logCategory(event.event)], fields(event.fields), ...event.spans.map(span => `${span.name}\n${fields(span.fields)}`)].join('\n').toLowerCase()
 }
