@@ -5,7 +5,7 @@ export const MAX_WATERFALL_LIMIT = 10_000
 export function validWaterfallLimit(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_WATERFALL_LIMIT
 }
-export const DEFAULT_LOG_LIMIT = 100_000
+export const DEFAULT_LOG_LIMIT = 10_000
 export const MAX_LOG_LIMIT = 1_000_000
 export function validLogLimit(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1000 && value <= MAX_LOG_LIMIT

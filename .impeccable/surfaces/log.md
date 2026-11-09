@@ -30,7 +30,7 @@ Use stable colors for Connection (blue), Routing (primary), DNS (teal), Sniffing
 
 ## IndexedDB storage
 
-Retain captured events by backend address in IndexedDB for 30 minutes, with a browser-wide maximum set in Settings → Log storage (default 100,000). A worker handles batched writes, eviction, and summary queries; render 30 request summaries and 100 event bodies per page. Freeze fixes the time window while retention continues. Show storage failure status and use a bounded memory fallback. Demo remains memory-only. Preserve the existing visual tokens and compact timeline layout.
+Retain captured events by backend address in IndexedDB for 30 minutes, with a browser-wide maximum set in Settings → Log storage (default 10,000). A worker handles batched writes, eviction, and summary queries; render 30 request summaries and 100 event bodies per page. Freeze fixes the time window while retention continues. Show storage failure status and use a bounded memory fallback. Demo remains memory-only. Preserve the existing visual tokens and compact timeline layout.
 
 ## Stable reading position
 
