@@ -118,6 +118,8 @@ The output is `dist-single/index.html`, with JavaScript, CSS, and the dashboard 
 
 ## Releases
 
+See [CHANGELOG.md](CHANGELOG.md) for changes in each version.
+
 Push a tag starting with `v` (for example, `v0.1.5`) to run [.github/workflows/release.yml](.github/workflows/release.yml). The workflow installs the pinned dependencies, runs tests, builds both dashboard formats, and publishes a GitHub release with two assets:
 
 - `dist.zip`: the contents of `dist/` at the archive root, using the default `/` base path. Extract it into your web server's document root and configure the API proxy as described above.
